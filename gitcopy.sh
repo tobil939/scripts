@@ -132,12 +132,12 @@ copy_files() {
 }
 
 # Kopieren der Dateien
-copy_files "${source_dirs[0]}" "$dest_base/.config/nvim/lua/plugins" "${nvim_plugin_files[@]}"
-copy_files "${source_dirs[1]}" "$dest_base/.config/nvim/lua/config" "${nvim_config_files[@]}"
-copy_files "${source_dirs[2]}" "$dest_base/.config/hypr" "${hypr_files[@]}"
-copy_files "${source_dirs[3]}" "$dest_base/.config/waybar" "${waybar_files[@]}"
-copy_files "${source_dirs[4]}" "$dest_base/.config/kitty" "${kitty_files[@]}"
-copy_files "${source_dirs[5]}" "$dest_base/.config/qutebrowser" "${qutebrowser_files[@]}"
+copy_files "${source_dirs[0]}" "$dest_base" "${nvim_plugin_files[@]}"
+copy_files "${source_dirs[1]}" "$dest_base" "${nvim_config_files[@]}"
+copy_files "${source_dirs[2]}" "$dest_base" "${hypr_files[@]}"
+copy_files "${source_dirs[3]}" "$dest_base" "${waybar_files[@]}"
+copy_files "${source_dirs[4]}" "$dest_base" "${kitty_files[@]}"
+copy_files "${source_dirs[5]}" "$dest_base" "${qutebrowser_files[@]}"
 
 # Kopieren der Skripte
 echo "Kopieren der Skripte" | tee -a "$log_file"

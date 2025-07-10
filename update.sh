@@ -1,18 +1,25 @@
 #!/bin/bash
 
-# Benutzernamen herausfinden
-echo -e "Benutzername: ?"
-user_name=$(whoami)
-mkdir -p "/home/$user_name/log/error"                                              # LOG Ordner erstellen
-LOG_FILE="/home/$user_name/log/install.log"                                        # LOG allgemein
-ERROR_LOG_FILE="/home/$user_name/log/error/errorinstall.log"                       # LOG Error
-datef="$(date '+%Y-%m-%d %H:%M:%S')"                                              # Datum formatieren
+# Bibliothek einbinden
+source /usr/local/lib/loglib.sh
 
-# Erste LOG Einträge
-echo -e "\n$datef Benutzername: $user_name\n" | tee -a "$LOG_FILE" 2> >(tee -a "$ERROR_LOG_FILE" >/dev/null)
+# Log Initialisieren
+init_logging || {
+  echo "Initialiserung fehlgeschlagen. Skript wird abgebrochen:"
+  exit 1
+}
+log_output "" date 
+log_tee "" date 
+log_output "" echo -e "Update Skript"
+log_tee "" echo -e "Update Skript"
 
 # Suchen nach Updates und installieren
-echo -e "\n\n\n------Update------" | tee -a "$LOG_FILE"
-sudo pacman -Syu --noconfirm 2> >(tee -a "$ERROR_LOG_FILE" >/dev/null) | tee -a "$LOG_FILE"
-yay -Syu --noconfirm 2> >(tee -a "$ERROR_LOG_FILE" >/dev/null) | tee -a "$LOG_FILE"
-sudo npm update -g 2> >(tee -a "$ERROR_LOG_FILE" >/dev/null) | tee -a "$LOG_FILE"
+log_tee "" echo -e "\n\n\n------Update------" 
+log_tee "" echo -e "\n\n\n------Update Archlinux Keyring------"
+log_output "" sudo pacman -Syu archlinux-keyring --noconfirm
+log_tee "" echo -e "\n\n\n------Update Pacman------"
+log_output "" sudo pacman -Syu --noconfirm  
+log_tee "" echo -e "\n\n\n------Update yay------"
+log_output "" yay -Syu --noconfirm 
+log_tee "" echo -e "\n\n\n------Update npm------"
+log_output "" sudo npm update -g  
