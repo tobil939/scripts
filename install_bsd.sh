@@ -58,7 +58,7 @@ echo "log anlegen"
 sudo touch /var/log/install
 sudo chmod 640 /var/log/install
 echo "syslog.conf einstellen"
-sudo sh -c 'echo "!bash_sh" >>/etc/syslog.conf'
+sudo sh -c 'echo "bsd_sh" >>/etc/syslog.conf'
 sudo sh -c 'echo "*.*     /var/log/install" >>/etc/syslog.conf'
 echo "syslog neu starten"
 sudo service syslogd reload
@@ -239,7 +239,7 @@ pass in on $lan_if prot tcp from any to any port {139, 445} keep state
 EOL
 
 #===== DHCP konfigurieren
-log="$(stamp) LOG ### pf.conf wird beschhrieben"
+log="$(stamp) LOG ### dhcp.conf wird beschhrieben"
 echo "$log"
 logger -t bsd_sh "$log"
 
@@ -360,11 +360,11 @@ sudo chmod -R 0775 /srv/samba/public || {
 }
 
 for user in "${users[@]}"; do
-  log="$(stamp) log ### user wir erzeugt"
+  log="$(stamp) LOG ### user wir erzeugt"
   echo "$log"
   logger -t bsd_sh "$log"
   sudo pw useradd $user -m || {
-    ero="$(stamp) ero ### $user konnte nicht erstellt werden"
+    ero="$(stamp) ERO ### $user konnte nicht erstellt werden"
     echo "$ero"
     logger -t bsd_sh "$ero"
     exit 1
@@ -372,39 +372,31 @@ for user in "${users[@]}"; do
 done
 
 for user in "${users[@]}"; do
-  log="$(stamp) log ### $user wir irgendwas"
+  log="$(stamp) LOG ### $user wir irgendwas"
   echo "$log"
   logger -t bsd_sh "$log"
   sudo pdbedit -a $user || {
-    ero="$(stamp) ero ### $user konnte nicht irgendwas werden"
+    ero="$(stamp) ERO ### $user konnte nicht irgendwas werden"
     echo "$ero"
     logger -t bsd_sh "$ero"
     exit 1
   }
 done
 
-log="$(stamp) LOG ### User fuer Samba anlegen"
-echo "$log"
-logger -t bsd_sh "$log"
 for user in "${users[@]}"; do
-  log="$(stamp) LOG ### $user wird angelegt"
-  ero="$(stamp) ERO ### $user konnte nicht angelegt werden"
-  sudo chown -R $user:users /srv/samba/private || {
-    echo "$log"
-    logger -t bsd_sh "$log"
-    exit 1
-  }
+    log="$(stamp) LOG ### Benutzer $user wird für Samba angelegt"
+    echo "$log" | tee -a /var/log/bsd_install.log | logger -t bsd_sh
+    sudo pw useradd "$user" -m || {
+        ero="$(stamp) ERO ### Benutzer $user konnte nicht erstellt werden"
+        echo "$ero" | tee -a /var/log/bsd_install.log | logger -t bsd_sh
+        exit 1
+    }
+    sudo pdbedit -a "$user" || {
+        ero="$(stamp) ERO ### Samba-Benutzer $user konnte nicht angelegt werden"
+        echo "$ero" | tee -a /var/log/bsd_install.log | logger -t bsd_sh
+        exit 1
+    }
 done
-
-log="$(stamp) LOG ### User 0700 Rechte vergeben"
-echo "$log"
-logger -t bsd_sh "$log"
-sudo chmod -R 0700 /srv/samba/private || {
-  ero="$(stamp) ERO ### 0700 konten nicht vergeben werden"
-  echo "$ero"
-  logger -t bsd_sh "$ero"
-  exit 1
-}
 
 log="$(stamp) LOG ### Firewall starten"
 echo "$log"
@@ -433,7 +425,7 @@ sudo service isc-dhcpd start || {
   exit 1
 }
 
-log="$(stamp) log ### ssh starten"
+log="$(stamp) LOG ### ssh starten"
 echo "$log"
 logger -t bsd_sh "$log"
 sudo service sshd start || {
@@ -443,7 +435,7 @@ sudo service sshd start || {
   exit 1
 }
 
-log="$(stamp) log ### ssh aktivieren"
+log="$(stamp) LOG ### ssh aktivieren"
 echo "$log"
 logger -t bsd_sh "$log"
 sudo sysrc sshd_enable="YES" || {
