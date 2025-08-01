@@ -3,7 +3,6 @@
 #===== Programme die mit pkg installiert werden
 prog1=(
   "neovim"
-  "nautilus"
   "kitty"
   "neofetch"
   "python3"
@@ -14,14 +13,12 @@ prog1=(
   "clamav"
   "samba413"
   "git"
-  "qutebrowser"
   "iftop"
   "nload"
   "vnstat"
   "unbound"
   "smartmontools"
   "hostapd"
-  "openssh"
 )
 
 #===== Programme die mit NPM installiert werden
@@ -38,11 +35,42 @@ users=(
   "user4"
 )
 
+git_repo=(
+  "config"
+  "scripts"
+  "neovim"
+)
+
+nvim_plugin_files=(
+  "aerial.lua"
+  "alpha.lua"
+  "cmp.lua"
+  "dap.lua"
+  "formatter.lua"
+  "help.lua"
+  "lint.lua"
+  "lsp.lua"
+  "lualine.lua"
+  "luasnip.lua"
+  "mason.lua"
+  "nvim-tree.lua"
+  "telescope.lua"
+  "toggleterm.lua"
+  "treesitter.lua"
+  "theme.lua"
+)
+nvim_config_files=(
+  "autocmds.lua"
+  "keymaps.lua"
+  "options.lua"
+)
+
+user_name="$(pwd)"
+
 #===== Zeitstempel werden definiert
 stamp() {
   date '+%H:%M:%S'
 }
-day=$(date '+%Y-%m-%d')
 
 #===== Konfigdateien
 rcconf="/etc/rc.conf"
@@ -53,119 +81,211 @@ sambaconf="/usr/local/etc/smb4.conf"
 sshconf="/etc/ssh/sshd_config"
 
 #===== Logging wird definerit
-echo "logging einrichten"
-echo "log anlegen"
-sudo touch /var/log/install
-sudo chmod 640 /var/log/install
-echo "syslog.conf einstellen"
-sudo sh -c 'echo "bsd_sh" >>/etc/syslog.conf'
-sudo sh -c 'echo "*.*     /var/log/install" >>/etc/syslog.conf'
-echo "syslog neu starten"
-sudo service syslogd reload
+loggin(){
+  day=$(date '+%Y-%m-%d')
+  echo "logging einrichten"
+  echo "log anlegen"
+  touch /var/log/install
+  chmod 640 /var/log/install
+  echo "syslog.conf einstellen"
+  sh -c 'echo "bsd_sh" >>/etc/syslog.conf'
+  sh -c 'echo "*.*     /var/log/install" >>/etc/syslog.conf'
+  echo "syslog neu starten"
+  service syslogd reload
 
-#===== Erster Loggeintrag
-log="$day $(stamp) LOG ### erster Log eintrag"
-echo "$log"
-logger -t bsd_sh "$log"
-
-#===== erstes Update
-log="$(stamp) LOG ### erstes Update"
-echo "$log"
-logger -t bsd_sh "$log"
-
-sudo pkg update || {
-  ero="$(stamp) ERO ### Update konnte nicht durchgeführt werden"
-  echo "$ero"
-  logger -t bsd_sh "$ero"
-  exit 1
+  #===== Erster Loggeintrag
+  log="$day $(stamp) LOG ### erster Log eintrag"
+  echo "$log"
+  logger -t bsd_sh "$log"
 }
 
-log="$(stamp) LOG ### erstes Upgrade"
-echo "$log"
-logger -t bsd_sh "$log"
+#===== als Root anmelden
+rooting(){
+  log="$(stamp) LOG ### als Root anmelden"
+  echo "$log" 
+  logger -t bsd_sh "$log"
+  su 
+}
 
-sudo pkg upgrade -y || {
-  ero="$(stamp) ERO ### Upgrade konnte nicht installiert werden"
-  echo "$ero"
-  logger -t bsd_sh "$ero"
-  exit 1
+#===== erstes Update
+updates(){
+  log="$(stamp) LOG ### erstes Update"
+  echo "$log"
+  logger -t bsd_sh "$log"
+
+  pkg update || {
+    ero="$(stamp) ERO ### Update konnte nicht durchgeführt werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
+
+  log="$(stamp) LOG ### erstes Upgrade"
+  echo "$log"
+  logger -t bsd_sh "$log"
+
+  pkg upgrade -y || {
+    ero="$(stamp) ERO ### Upgrade konnte nicht installiert werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
+}
+
+#===== Bash einrichten 
+setupBash(){ 
+  log="$(stamp) LOG ### Bash einrichten"
+  echo "$log"
+  logger -t bsd_sh "$log"
+  touch ~/.bashrc || { 
+    ero="$(stamp) ERO ### bashrc konnte nicht angelegt werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
+  
+  log="$(stamp) LOG ### Neofetch hinzugefuegt"
+  echo "$log" 
+  logger -t bsd_sh "$log"
+  echo "neofetch" >> ~/.bashrc || {
+    ero="$(stamp) ERO ### Neofetch konnte nicht hinzugefuegt werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
+
+  log="$(stamp) LOG ### Kitty als Terminal hinzugefuegt"
+  echo "$log" 
+  logger -t bsd_sh "$log"
+  echo "export TERMINAL=kitty" >> ~/.bashrc || {
+    ero="$(stamp) ERO ### Kitty als Termnial konnte nicht hinzugefuegt werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
 }
 
 #===== Programme werden mit pkg installiert
-for prog in "${prog1[@]}"; do
-  log="$(stamp) LOG ### $prog wird installiert"
-  ero="$(stamp) ERO ### $prog konnte nicht installiert werden"
-  echo "$log" && logger -t bsd_sh "$log"
-  sudo pkg install -y "$prog" || {
-    echo "$ero"
-    logger -t bsd_sh "$ero"
-    exit 1
-  }
-done
-
-#===== zweites update
-log="$(stamp) LOG ### zweites update"
-echo "$log"
-logger -t bsd_sh "$log"
-
-sudo pkg update || {
-  ero="$(stamp) ERO ### update konnte nicht durchgeführt werden"
-  echo "$ero"
-  logger -t bsd_sh "$ero"
-  exit 1
-}
-
-log="$(stamp) LOG ### zweites Upgrade"
-echo "$log"
-logger -t bsd_sh "$log"
-
-sudo pkg upgrade -y || {
-  ero="$(stamp) ERO ### Upgrade konnte nicht installiert werden"
-  echo "$ero"
-  logger -t bsd_sh "$ero"
-  exit 1
+installprog(){
+  for prog in "${prog1[@]}"; do
+    log="$(stamp) LOG ### $prog wird installiert"
+    ero="$(stamp) ERO ### $prog konnte nicht installiert werden"
+    echo "$log" && logger -t bsd_sh "$log"
+    pkg install -y "$prog" || {
+      echo "$ero"
+      logger -t bsd_sh "$ero"
+      exit 1
+    }
+  done
 }
 
 #===== Programme werden mit npm installiert
-for prog in "${npmprog[@]}"; do
-  log="$(stamp) LOG ### $prog wird installiert"
-  ero="$(stamp) ERO ### $prog konnte nicht installiert werden"
-  sudo npm install -g "$prog" --silent || {
-    echo "$ero"
-    logger -t bsd_sh "$ero"
-    exit 1
-  }
-done
-
-#===== drittes update
-log="$(stamp) LOG ### drittes update"
-echo "$log"
-logger -t bsd_sh "$log"
-
-sudo pkg update || {
-  ero="$(stamp) ERO ### update konnte nicht durchgeführt werden"
-  echo "$ero"
-  logger -t bsd_sh "$ero"
-  exit 1
+installnpm(){
+  for prog in "${npmprog[@]}"; do
+    log="$(stamp) LOG ### $prog wird installiert"
+    ero="$(stamp) ERO ### $prog konnte nicht installiert werden"
+    npm install -g "$prog" --silent || {
+      echo "$ero"
+      logger -t bsd_sh "$ero"
+      exit 1
+    }
+  done
 }
 
-log="$(stamp) LOG ### drittes Upgrade"
-echo "$log"
-logger -t bsd_sh "$log"
+#===== Ordnererstellung
+makeDir(){
+  mkdir -p "/home/$user_name/Git/config/" "/home/$user_name/Git/scripts" >>"$log_file" 2>>"$error_log_file"
+  mkdir -p "/home/$user_name/Scripts" "/home/$user_name/git1/config" "/home/$user_name/git1/scripts" "/home/$user_name/git1/neovim" >>"$log_file" 2>>"$error_log_file"
+  mkdir -p "$HOME/.config/nvim/lua/config" "$HOME/.config/nvim/lua/plugins" "$HOME/.config/hypr" "$HOME/.config/waybar" "$HOME/.config/kitty" "$HOME/.config/qutebrowser" 
+}
 
-sudo pkg upgrade -y || {
-  ero="$(stamp) ERO ### Upgrade konnte nicht installiert werden"
-  echo "$ero"
-  logger -t bsd_sh "$ero"
-  exit 1
+#===== Git-Repositories klonen
+gitClone(){
+  echo -e "\n ------Dateien klonen------"
+  notify-send "Dateien werden geklont"
+  for repo in "${git_repo[@]}"; do
+    echo "$repo" >>"$log_file" 2>>"$error_log_file"
+    git clone "https://github.com/tobil939/$repo.git" "/home/$user_name/git1/$repo" >>"$log_file" 2>>"$error_log_file"
+    echo "https://github.com/tobil939/$repo.git" >>"$log_file" 2>>"$error_log_file"
+    echo "/home/$user_name/git1/$repo" >>"$log_file" 2>>"$error_log_file"
+    check_error "Klonen von $repo" >>"$log_file" 2>>"$error_log_file"
+  done
+}
+
+#===== Dateien aus tobil939/config kopieren
+confCopy(){
+  echo -e "\n ------Daten kopieren (config)------"
+  notify-send "Konfigurationsdateien werden kopiert"
+  cd /home/$user_name/git1/config
+  check_error "Wechseln in config-Verzeichnis"
+
+  #===== Neovim-Dateien
+  for file in "${nvim_plugin_files[@]}"; do
+    if [ ! -f "/home/$user_name/git1/config/$file" ]; then
+      echo "Fehler: $file existiert nicht in /home/$user_name/git1/config/" >>"$log_file" 2>>"$error_log_file"
+      check_error "Quelldatei $file fehlt"
+    fi
+    if [ -f "$HOME/.config/nvim/lua/plugins/$file" ]; then
+      mv "$HOME/.config/nvim/lua/plugins/$file" "$HOME/.config/nvim/lua/plugins/$file.bak" >>"$log_file" 2>>"$error_log_file"
+      echo "Backup von $file erstellt" >>"$log_file"
+    else
+      mkdir -p "$HOME/.config/nvim/lua/plugins/"
+      echo "nvim plugins Ordner wurde ertellt"
+    fi
+    cp "/home/$user_name/git1/config/$file" "$HOME/.config/nvim/lua/plugins/$file" >>"$log_file" 2>>"$error_log_file"
+    check_error "Kopieren von $file"
+  done
+  for file in "${nvim_config_files[@]}"; do
+    if [ ! -f "/home/$user_name/git1/config/$file" ]; then
+      echo "Fehler: $file existiert nicht in /home/$user_name/git1/config/" >>"$log_file" 2>>"$error_log_file"
+      check_error "Quelldatei $file fehlt"
+    else
+      mkdir -p "$HOME/.config/nvim/lua/config/"
+      echo "nvim config Ordner wurde erstllt"
+    fi
+    if [ -f "$HOME/.config/nvim/lua/config/$file" ]; then
+      mv "$HOME/.config/nvim/lua/config/$file" "$HOME/.config/nvim/lua/config/$file.bak" >>"$log_file" 2>>"$error_log_file"
+      echo "Backup von $file erstellt" >>"$log_file"
+    fi
+    cp "/home/$user_name/git1/config/$file" "$HOME/.config/nvim/lua/config/$file" >>"$log_file" 2>>"$error_log_file"
+    check_error "Kopieren von $file"
+  done
+  if [ ! -f "/home/$user_name/git1/config/init.lua" ]; then
+    echo "Fehler: init.lua existiert nicht in /home/$user_name/git1/config/" >>"$log_file" 2>>"$error_log_file"
+    check_error "Quelldatei init.lua fehlt"
+  fi
+  if [ -f "$HOME/.config/nvim/init.lua" ]; then
+    mv "$HOME/.config/nvim/init.lua" "$HOME/.config/nvim/init.lua.bak" >>"$log_file" 2>>"$error_log_file"
+    echo "Backup von init.lua erstellt" >>"$log_file"
+  fi
+  cp "/home/$user_name/git1/config/init.lua" "$HOME/.config/nvim/init.lua" >>"$log_file" 2>>"$error_log_file"
+  check_error "Kopieren von init.lua"
+
+  # Hyprland-Dateien
+  for file in "${hypr_files[@]}"; do
+    if [ ! -f "/home/$user_name/git1/config/$file" ]; then
+      echo "Fehler: $file existiert nicht in /home/$user_name/git1/config/" >>"$log_file" 2>>"$error_log_file"
+      check_error "Quelldatei $file fehlt"
+    fi
+    if [ -f "$HOME/.config/hypr/$file" ]; then
+      mv "$HOME/.config/hypr/$file" "$HOME/.config/hypr/$file.bak" >>"$log_file" 2>>"$error_log_file"
+      echo "Backup von $file erstellt" >>"$log_file"
+    else
+      mkdir -p "$HOME/.config/hypr/"
+      echo "hypr Ordner wurde erstellt"
+    fi
+    cp "/home/$user_name/git1/config/$file" "$HOME/.config/hypr/$file" >>"$log_file" 2>>"$error_log_file"
+    check_error "Kopieren von $file"
+  done
 }
 
 #===== Netzwerkschnittstellen konfigurieren
-log="$(stamp) LOG ### rc.conf wird beschhrieben"
-echo "$log"
-logger -t bsd_sh "$log"
+ipConfigRouter(){
+  log="$(stamp) LOG ### rc.conf wird beschhrieben"
+  echo "$log"
+  logger -t bsd_sh "$log"
 
-cat >>"$rcconf" <<EOL
+  cat >>"$rcconf" <<EOL
 # Interet-Schnittstell (DHCP vom Provider)
 ifconfig_eno1="DHCP"
 
@@ -192,15 +312,16 @@ dhcp_ifaces="bridge0"
 # Wlan Accespoint aktivieren 
 hostapd_enable="YES"
 hostapd_flags="/usr/local/etc/hostapd.conf"
-
 EOL
+}
 
 #===== Firewall konfigurieren
-log="$(stamp) LOG ### pf.conf wird beschhrieben"
-echo "$log"
-logger -t bsd_sh "$log"
+firewallConfigRouter(){
+  log="$(stamp) LOG ### pf.conf wird beschhrieben"
+  echo "$log"
+  logger -t bsd_sh "$log"
 
-cat >>"$pfconf" <<EOL
+  cat >>"$pfconf" <<EOL
 # Interfaces
 ext_if = "eno1"
 lan_if = "bridge0"
@@ -235,15 +356,17 @@ pass in on $ext_if proto tcp from any to ($ext_if) port 22 keep state
 pass in on $lan_if proto tcp from any to any port 22 keep state
 
 # Allow Samba 
-pass in on $lan_if prot tcp from any to any port {139, 445} keep state 
+pass in on $lan_if proto tcp from any to any port {139, 445} keep state 
 EOL
+}
 
 #===== DHCP konfigurieren
-log="$(stamp) LOG ### dhcp.conf wird beschhrieben"
-echo "$log"
-logger -t bsd_sh "$log"
+dhcpConfig(){
+  log="$(stamp) LOG ### dhcp.conf wird beschhrieben"
+  echo "$log"
+  logger -t bsd_sh "$log"
 
-cat >>"$dhcpconf" <<EOL
+  cat >>"$dhcpconf" <<EOL
 option domain-name "home.local";
 option domain-name-servers 10.10.10.1, 1.1.1.1;
 
@@ -256,15 +379,16 @@ subnet 10.10.10.0 netmask 255.255.255.0 {
   option broadcast-address 10.10.10.255;
   option subnet-mask 255.255.255.0;
 }
-
 EOL
+}
 
 #===== WLan Accespoint konfigurieren
-log="$(stamp) LOG ### hostapd.conf wird beschhrieben"
-echo "$log"
-logger -t bsd_sh "$log"
+wlanConfig(){
+  log="$(stamp) LOG ### hostapd.conf wird beschhrieben"
+  echo "$log"
+  logger -t bsd_sh "$log"
 
-cat >>"$hostapdconf" <<EOL
+  cat >>"$hostapdconf" <<EOL
 interface=wlan1
 driver=bsd
 ssid=MeinHeimnetz
@@ -275,15 +399,16 @@ wpa=2
 wpa_key_mgmt=WPA-PSK
 wpa_passphrase=DeinSicheresPasswort
 rsn_pairwise=CCMP
-
 EOL
+}
 
 #===== Samba einrichten
-log="$(stamp) LOG ### smb4.conf wird beschrieben"
-echo "$log"
-logger -t bsd_sh "$log"
+sambaConfig(){
+  log="$(stamp) LOG ### smb4.conf wird beschrieben"
+  echo "$log"
+  logger -t bsd_sh "$log"
 
-cat >>"$sambaconf" <<EOL
+  cat >>"$sambaconf" <<EOL
 [global]
    workgroup = WORKGROUP
    server string = FreeBSD Samba Server
@@ -311,178 +436,292 @@ cat >>"$sambaconf" <<EOL
    create mask = 0700
    directory mask = 0700
 EOL
+}
 
-#===== SSH Konfiguration ändern
-log="$(stamp) LOG ### sshd_config wird angepasst"
-echo "$log"
-logger -t bsd_sh "$log"
-sudo sed -i '' -e '/^#\?X11Forwarding/s/.*/X11Forwarding yes/' "$sshconf"
-sudo sed -i '' -e '/^#\?X11UseLocalhost/s/.*/X11UseLocalhost no/' "$sshconf"
-grep -q '^X11Forwarding' "$sshconf" || echo "X11Forwarding yes" | sudo tee -a "$sshconf"
-grep -q '^X11UseLocalhost' "$sshconf" || echo "X11UseLocalhost no" | sudo tee -a "$sshconf"
 
 #===== Samba Verzeichnisse und Rechte anlegen
-log="$(stamp) LOG ### public Verzeiniss anlegen"
-echo "$log"
-logger -t bsd_sh "$log"
-sudo mkdir -p /srv/samba/public || {
-  ero="$(stamp) ERO ### public Verzeiniss konnte nicht anlegen werden"
-  echo "$ero"
-  logger -t bsd_sh "$ero"
-  exit 1
-}
-log="$(stamp) LOG ### private Verzeiniss anlegen"
-echo "$log"
-logger -t bsd_sh "$log"
-sudo mkdir -p /srv/samba/private || {
-  ero="$(stamp) ERO ### private Verzeiniss konnte nicht anlegen werden"
-  echo "$ero"
-  logger -t bsd_sh "$ero"
-  exit 1
-}
-log="$(stamp) LOG ### Rechte nobody vergeben"
-echo "$log"
-logger -t bsd_sh "$log"
-sudo chown -R nobody:nogroup /srv/samba/public || {
-  ero="$(stamp) ERO ### rechte nobody konnten nicht vergeben werden"
-  echo "$ero"
-  logger -t bsd_sh "$ero"
-  exit 1
-}
-log="$(stamp) LOG ### 0775 für public"
-echo "$log"
-logger -t bsd_sh "$log"
-sudo chmod -R 0775 /srv/samba/public || {
-  ero="$(stamp) ERO ### 0775 konten nicht vergeben werden"
-  echo "$ero"
-  logger -t bsd_sh "$ero"
-  exit 1
-}
-
-for user in "${users[@]}"; do
-  log="$(stamp) LOG ### user wir erzeugt"
+sambaUser(){
+  log="$(stamp) LOG ### public Verzeiniss anlegen"
   echo "$log"
   logger -t bsd_sh "$log"
-  sudo pw useradd $user -m || {
-    ero="$(stamp) ERO ### $user konnte nicht erstellt werden"
+  mkdir -p /srv/samba/public || {
+    ero="$(stamp) ERO ### public Verzeiniss konnte nicht anlegen werden"
     echo "$ero"
     logger -t bsd_sh "$ero"
     exit 1
   }
-done
-
-for user in "${users[@]}"; do
-  log="$(stamp) LOG ### $user wir irgendwas"
+  log="$(stamp) LOG ### private Verzeiniss anlegen"
   echo "$log"
   logger -t bsd_sh "$log"
-  sudo pdbedit -a $user || {
-    ero="$(stamp) ERO ### $user konnte nicht irgendwas werden"
+  mkdir -p /srv/samba/private || {
+    ero="$(stamp) ERO ### private Verzeiniss konnte nicht anlegen werden"
     echo "$ero"
     logger -t bsd_sh "$ero"
     exit 1
   }
-done
+  log="$(stamp) LOG ### Rechte nobody vergeben"
+  echo "$log"
+  logger -t bsd_sh "$log"
+  chown -R nobody:nogroup /srv/samba/public || {
+    ero="$(stamp) ERO ### rechte nobody konnten nicht vergeben werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
+  log="$(stamp) LOG ### 0775 für public"
+  echo "$log"
+  logger -t bsd_sh "$log"
+  chmod -R 0775 /srv/samba/public || {
+    ero="$(stamp) ERO ### 0775 konten nicht vergeben werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
 
-for user in "${users[@]}"; do
+  log="$(stamp) LOG ### Gruppe user wurde angelegt"
+  echo "$log"
+  logger -t bsd_sh "$log"
+  pw groupadd users || {
+    ero="$(stamp) ERO ### Gruppe user konnte nicht angelegt werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1 
+  }
+
+  for user in "${users[@]}"; do
     log="$(stamp) LOG ### Benutzer $user wird für Samba angelegt"
     echo "$log" | tee -a /var/log/bsd_install.log | logger -t bsd_sh
-    sudo pw useradd "$user" -m || {
-        ero="$(stamp) ERO ### Benutzer $user konnte nicht erstellt werden"
-        echo "$ero" | tee -a /var/log/bsd_install.log | logger -t bsd_sh
-        exit 1
+    pw useradd "$user" -m || {
+      ero="$(stamp) ERO ### Benutzer $user konnte nicht erstellt werden"
+      logger -t bsd_sh "$ero"
+      exit 1
     }
-    sudo pdbedit -a "$user" || {
-        ero="$(stamp) ERO ### Samba-Benutzer $user konnte nicht angelegt werden"
-        echo "$ero" | tee -a /var/log/bsd_install.log | logger -t bsd_sh
-        exit 1
+    pdbedit -a "$user" || {
+      ero="$(stamp) ERO ### Samba-Benutzer $user konnte nicht angelegt werden"
+      logger -t bsd_sh "$ero"
+      exit 1
     }
-done
+  done
 
-log="$(stamp) LOG ### Firewall starten"
-echo "$log"
-logger -t bsd_sh "$log"
-sudo service pf start || {
-  ero="$(stamp) ERO ### Firewall konnte nicht neu gestartet werden"
-  echo "$ero"
-  logger -t bsd_sh "$ero"
-  exit 1
+  log="$(stamp) LOG ### user werden in die Gruppe users hinzugefuegt"
+  echo "$log"
+  logger -t bsd_sh "$log"
+  for user in "${users{[@]}"; do 
+    pw groupmod users -m "$user" || { 
+      ero="$(stamp) ERO ### Benutzer $user konnte nicht zur Gruppe hinzugefuegt werden"
+      logger -t bsd_sh "$ero"
+      exit 1
+    }
+  done
 }
 
-sudo pfctl -f /etc/pf.conf || {
-  ero="$(stamp) ERO ### Firewall konnte nicht neu gestartet werden"
-  echo "$ero"
-  logger -t bsd_sh "$ero"
-  exit 1
+#===== SSH Konfiguration ändern
+sshConfig(){
+  log="$(stamp) LOG ### sshd_config wird angepasst"
+  echo "$log"
+  logger -t bsd_sh "$log"
+  sed -i '' -e '/^#\?X11Forwarding/s/.*/X11Forwarding yes/' "$sshconf"
+  sed -i '' -e '/^#\?X11UseLocalhost/s/.*/X11UseLocalhost no/' "$sshconf"
+  grep -q '^X11Forwarding' "$sshconf" || echo "X11Forwarding yes" | tee -a "$sshconf"
+  grep -q '^X11UseLocalhost' "$sshconf" || echo "X11UseLocalhost no" | tee -a "$sshconf"
 }
 
-log="$(stamp) LOG ### DHCP starten"
-echo "$log"
-logger -t bsd_sh "$log"
-sudo service isc-dhcpd start || {
-  ero="$(stamp) ERO ### DHCP konnte nicht neu gestartet werden"
-  echo "$ero"
-  logger -t bsd_sh "$ero"
-  exit 1
+startFirewall(){
+  log="$(stamp) LOG ### Firewall starten"
+  echo "$log"
+  logger -t bsd_sh "$log"
+  service pf start || {
+    ero="$(stamp) ERO ### Firewall konnte nicht neu gestartet werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
+
+  pfctl -f /etc/pf.conf || {
+    ero="$(stamp) ERO ### Firewall konnte nicht neu gestartet werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
+
+  log="$(stamp) LOG ### Firewall aktivieren"
+  echo "$log"
+  logger -t bsd_sh "$log"
+  sysrc pf_enable="YES" || {
+    ero="$(stamp) ERO ### Firewall konnte nicht aktiviert werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
 }
 
-log="$(stamp) LOG ### ssh starten"
-echo "$log"
-logger -t bsd_sh "$log"
-sudo service sshd start || {
-  ero="$(stamp) ero ### ssh konnte nicht neu gestartet werden"
-  echo "$ero"
-  logger -t bsd_sh "$ero"
-  exit 1
+startDhcp(){
+  log="$(stamp) LOG ### DHCP starten"
+  echo "$log"
+  logger -t bsd_sh "$log"
+  service isc-dhcpd start || {
+    ero="$(stamp) ERO ### DHCP konnte nicht neu gestartet werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
+
+  log="$(stamp) LOG ### DHCP aktivieren"
+  echo "$log"
+  logger -t bsd_sh "$log"
+  sysrc isc_dhcpd_enable="YES" || {
+    ero="$(stamp) ERO ### DHCP konnte nicht aktiviert werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
 }
 
-log="$(stamp) LOG ### ssh aktivieren"
-echo "$log"
-logger -t bsd_sh "$log"
-sudo sysrc sshd_enable="YES" || {
-  ero="$(stamp) ero ### ssh konnte nicht aktiviert werden"
-  echo "$ero"
-  logger -t bsd_sh "$ero"
-  exit 1
+startSsh(){
+  log="$(stamp) LOG ### ssh starten"
+  echo "$log"
+  logger -t bsd_sh "$log"
+  service sshd start || {
+    ero="$(stamp) ero ### ssh konnte nicht neu gestartet werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
+
+  log="$(stamp) LOG ### ssh aktivieren"
+  echo "$log"
+  logger -t bsd_sh "$log"
+  sysrc sshd_enable="YES" || {
+    ero="$(stamp) ero ### ssh konnte nicht aktiviert werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
 }
 
-log="$(stamp) LOG ### Samba starten"
-echo "$log"
-logger -t bsd_sh "$log"
-sudo service samba_server start || {
-  ero="$(stamp) ERO ### Samba konnte nicht gestartet werden"
-  echo "$ero"
-  logger -t bsd_sh "$ero"
-  exit 1
+startSamba(){
+  log="$(stamp) LOG ### Samba starten"
+  echo "$log"
+  logger -t bsd_sh "$log"
+  service samba_server start || {
+    ero="$(stamp) ERO ### Samba konnte nicht gestartet werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
+
+  log="$(stamp) LOG ### Samba aktivieren"
+  echo "$log"
+  logger -t bsd_sh "$log"
+  sysrc samba_server_enable="YES" || {
+    ero="$(stamp) ERO ### Samba konnte nicht aktiviert werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
 }
 
-log="$(stamp) LOG ### Samba aktivieren"
-echo "$log"
-logger -t bsd_sh "$log"
-sudo sysrc samba_server_enable="YES" || {
-  ero="$(stamp) ERO ### Samba konnte nicht aktiviert werden"
-  echo "$ero"
-  logger -t bsd_sh "$ero"
-  exit 1
+startWlan(){
+  log="$(stamp) LOG ### hostapd aktivieren"
+  echo "$log"
+  logger -t bsd_sh "$log"
+  sysrc hostapd_enable="YES" || {
+    ero="$(stamp) ERO ### hostapd konnte nicht aktiviert werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
+}
+
+startAntivir(){
+  log="$(stamp) LOG ### Antivirus aktivieren"
+  echo "$log"
+  logger -t bsd_sh "$log"
+  sysrc clamav_clamd_enable="YES" || {
+    ero="$(stamp) ERO ### Antivirus konnte nicht aktiviert werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
 }
 
 #===== Konfig ueberpruefen
-ifconfig || {
-  ero="$(stamp) ERO ### ifconfig konnte nicht ausgefuehrt werden"
-  echo "$ero"
-  logger -t bsd_sh "$ero"
-  exit 1
+checkConfigRouter(){
+  ifconfig || {
+    ero="$(stamp) ERO ### ifconfig konnte nicht ausgefuehrt werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
+
+  pfctl -s info || {
+    ero="$(stamp) ERO ### Firewall info konnte nicht ausgelesen werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
+
+  pfctl -s rules || {
+    ero="$(stamp) ERO ### Firewall rules konnte nicht ausgelesen werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
 }
 
-sudo pfctl -s info || {
-  ero="$(stamp) ERO ### Firewall info konnte nicht ausgelesen werden"
-  echo "$ero"
-  logger -t bsd_sh "$ero"
-  exit 1
+main(){
+  # Zeitstempel 
+  stamp
+
+  # Logging einrichten
+  loggin 
+
+  # Als su anmelden 
+  rooting
+
+  # erstes Update
+  updates
+
+  # Bash einrichten 
+  setupBash
+
+  # Installation von pkg Programmen
+  installprog
+
+  # Installation von npm Programmen 
+  installnpm 
+  
+  # zweites Update
+  updates
+
+  # Ordnerstruktur erstellen 
+  makeDir 
+
+  # Git Repos clonen 
+  gitClone 
+
+  # Konfigurationsdateien kopieren 
+  confCopy 
+
+  # Setup Router 
+  ipConfigRouter
+  firewallConfigRouter
+  dhcpConfig 
+  wlanConfig 
+  sambaConfig 
+  sambaUser 
+  sshConfig 
+  startFirewall 
+  startDhcp 
+  startSsh 
+  startSamba 
+  startWlan 
+  startAntivir 
+
+  # Check Setup Router
+  checkConfigRouter
+
+  # drittes Update 
+  updates 
 }
 
-sudo pfctl -s rules || {
-  ero="$(stamp) ERO ### Firewall rules konnte nicht ausgelesen werden"
-  echo "$ero"
-  logger -t bsd_sh "$ero"
-  exit 1
-}
