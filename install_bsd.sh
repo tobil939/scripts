@@ -19,6 +19,8 @@ prog1=(
   "unbound"
   "smartmontools"
   "hostapd"
+  "pdbedit"
+
 )
 
 #===== Programme die mit NPM installiert werden
@@ -65,7 +67,24 @@ nvim_config_files=(
   "options.lua"
 )
 
-user_name="$(pwd)"
+user_name="$(whoami)"
+
+#===== Wlan Accespoint Konfiguration
+wpaID=""
+wpaPW=""
+
+#===== IP-Adrese
+netMask="255.255.255.0"
+routerIP="10.10.10.1"
+speicher2IP="10.10.10.2"
+
+#===== Ports
+portDHCPfrom="67"
+portDHCPto="68"
+portDNS="53"
+portSSH="22"
+portSambafrom="139"
+portSambato="455"
 
 #===== Zeitstempel werden definiert
 stamp() {
@@ -81,7 +100,7 @@ sambaconf="/usr/local/etc/smb4.conf"
 sshconf="/etc/ssh/sshd_config"
 
 #===== Logging wird definerit
-loggin(){
+loggin() {
   day=$(date '+%Y-%m-%d')
   echo "logging einrichten"
   echo "log anlegen"
@@ -100,15 +119,15 @@ loggin(){
 }
 
 #===== als Root anmelden
-rooting(){
+rooting() {
   log="$(stamp) LOG ### als Root anmelden"
-  echo "$log" 
+  echo "$log"
   logger -t bsd_sh "$log"
-  su 
+  su
 }
 
 #===== erstes Update
-updates(){
+updates() {
   log="$(stamp) LOG ### erstes Update"
   echo "$log"
   logger -t bsd_sh "$log"
@@ -132,22 +151,22 @@ updates(){
   }
 }
 
-#===== Bash einrichten 
-setupBash(){ 
+#===== Bash einrichten
+setupBash() {
   log="$(stamp) LOG ### Bash einrichten"
   echo "$log"
   logger -t bsd_sh "$log"
-  touch ~/.bashrc || { 
+  touch ~/.bashrc || {
     ero="$(stamp) ERO ### bashrc konnte nicht angelegt werden"
     echo "$ero"
     logger -t bsd_sh "$ero"
     exit 1
   }
-  
+
   log="$(stamp) LOG ### Neofetch hinzugefuegt"
-  echo "$log" 
+  echo "$log"
   logger -t bsd_sh "$log"
-  echo "neofetch" >> ~/.bashrc || {
+  echo "neofetch" >>~/.bashrc || {
     ero="$(stamp) ERO ### Neofetch konnte nicht hinzugefuegt werden"
     echo "$ero"
     logger -t bsd_sh "$ero"
@@ -155,9 +174,9 @@ setupBash(){
   }
 
   log="$(stamp) LOG ### Kitty als Terminal hinzugefuegt"
-  echo "$log" 
+  echo "$log"
   logger -t bsd_sh "$log"
-  echo "export TERMINAL=kitty" >> ~/.bashrc || {
+  echo "export TERMINAL=kitty" >>~/.bashrc || {
     ero="$(stamp) ERO ### Kitty als Termnial konnte nicht hinzugefuegt werden"
     echo "$ero"
     logger -t bsd_sh "$ero"
@@ -166,7 +185,7 @@ setupBash(){
 }
 
 #===== Programme werden mit pkg installiert
-installprog(){
+installprog() {
   for prog in "${prog1[@]}"; do
     log="$(stamp) LOG ### $prog wird installiert"
     ero="$(stamp) ERO ### $prog konnte nicht installiert werden"
@@ -180,7 +199,7 @@ installprog(){
 }
 
 #===== Programme werden mit npm installiert
-installnpm(){
+installnpm() {
   for prog in "${npmprog[@]}"; do
     log="$(stamp) LOG ### $prog wird installiert"
     ero="$(stamp) ERO ### $prog konnte nicht installiert werden"
@@ -193,94 +212,143 @@ installnpm(){
 }
 
 #===== Ordnererstellung
-makeDir(){
-  mkdir -p "/home/$user_name/Git/config/" "/home/$user_name/Git/scripts" >>"$log_file" 2>>"$error_log_file"
-  mkdir -p "/home/$user_name/Scripts" "/home/$user_name/git1/config" "/home/$user_name/git1/scripts" "/home/$user_name/git1/neovim" >>"$log_file" 2>>"$error_log_file"
-  mkdir -p "$HOME/.config/nvim/lua/config" "$HOME/.config/nvim/lua/plugins" "$HOME/.config/hypr" "$HOME/.config/waybar" "$HOME/.config/kitty" "$HOME/.config/qutebrowser" 
+makeDir() {
+  log="$(stamp) LOG ### Ordnerstruktur wird erstellt"
+  echo "$log"
+  logger -t bsd_sh "$log"
+  log="$(stamp) LOG ### /.config/nvim/lua/config/ wird erstellt"
+  mkdir -p "/home/$user_name/.config/nvim/lua/config/" || {
+    ero="$(stamp) ERO ### nvim/lua/config/ konnte nicht erstellt werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
+
+  log="$(stamp) LOG ### /.config/nvim/lua/plugins wird erstellt"
+  echo "$log"
+  logger -t bsd_sh "$log"
+  mkdir -p "/home/$user_name/.config/nvim/lua/plugins/" || {
+    ero="$(stamp) ERO ### nvim/lua/plugins/ konnte nicht erstellt werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
+
+  log="$(stamp) LOG ### /.config/kitty wird erstellt"
+  echo "$log"
+  logger -t bsd_sh "$log"
+  mkdir -p "/home/$user_name/.config/kitty/" || {
+    ero="$(stamp) ERO ### /.config/kitty/ konnte nicht erstellt werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
+
+  log="$(stamp) LOG ### Scripts wird erstellt"
+  echo "$log"
+  logger -t bsd_sh "$log"
+  mkdir -p "/home/$user_name/Scripts" || {
+    ero="$(stamp) ERO ### Scritps konnte nicht erstellt werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
+
+  log="$(stamp) LOG ### git1 wird erstellt"
+  echo "$log"
+  logger -t bsd_sh "$log"
+  mkdir -p "/home/$user_name/git1" || {
+    ero="$(stamp) ERO ### git1 konnte nicht erstellt werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
 }
 
 #===== Git-Repositories klonen
-gitClone(){
-  echo -e "\n ------Dateien klonen------"
-  notify-send "Dateien werden geklont"
+gitClone() {
   for repo in "${git_repo[@]}"; do
-    echo "$repo" >>"$log_file" 2>>"$error_log_file"
-    git clone "https://github.com/tobil939/$repo.git" "/home/$user_name/git1/$repo" >>"$log_file" 2>>"$error_log_file"
-    echo "https://github.com/tobil939/$repo.git" >>"$log_file" 2>>"$error_log_file"
-    echo "/home/$user_name/git1/$repo" >>"$log_file" 2>>"$error_log_file"
-    check_error "Klonen von $repo" >>"$log_file" 2>>"$error_log_file"
+    log="$(stamp) LOG ### $repo wird gecloned"
+    echo "$log"
+    logger -t bsd_sh "$log"
+    git clone "https://github.com/tobil939/$repo.git" || {
+      ero="$(stamp) ERO ### $repo konnte nicht gecloned werden"
+      echo "$ero"
+      logger -t bsd_sh "$ero"
+      exit 1
+    }
   done
 }
 
-#===== Dateien aus tobil939/config kopieren
-confCopy(){
-  echo -e "\n ------Daten kopieren (config)------"
-  notify-send "Konfigurationsdateien werden kopiert"
-  cd /home/$user_name/git1/config
-  check_error "Wechseln in config-Verzeichnis"
+#===== Dateien aus tobil939/git kopieren
+gitCopy() {
+  log="$(stamp) LOG ### git Daten werden kopiert"
+  echo "$log"
+  logger -t bsd_sh "$log"
 
-  #===== Neovim-Dateien
-  for file in "${nvim_plugin_files[@]}"; do
-    if [ ! -f "/home/$user_name/git1/config/$file" ]; then
-      echo "Fehler: $file existiert nicht in /home/$user_name/git1/config/" >>"$log_file" 2>>"$error_log_file"
-      check_error "Quelldatei $file fehlt"
-    fi
-    if [ -f "$HOME/.config/nvim/lua/plugins/$file" ]; then
-      mv "$HOME/.config/nvim/lua/plugins/$file" "$HOME/.config/nvim/lua/plugins/$file.bak" >>"$log_file" 2>>"$error_log_file"
-      echo "Backup von $file erstellt" >>"$log_file"
-    else
-      mkdir -p "$HOME/.config/nvim/lua/plugins/"
-      echo "nvim plugins Ordner wurde ertellt"
-    fi
-    cp "/home/$user_name/git1/config/$file" "$HOME/.config/nvim/lua/plugins/$file" >>"$log_file" 2>>"$error_log_file"
-    check_error "Kopieren von $file"
-  done
+  log="$(stamp) LOG ### Scripts Daten werden kopiert"
+  echo "$log"
+  logger -t bsd_sh "$log"
+  cp -r "/home/$user_name/git1/scripts/" "/home/$user_name/Scripts/" || {
+    ero="$(stamp) ERO ### Scripts konnte nicht kopiert werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
+
+  log="$(stamp) LOG ### kitty.conf Daten werden kopiert"
+  echo "$log"
+  logger -t bsd_sh "$log"
+  cp "/home/$user_name/git1/config/kitty.conf" "/home/$user_name/.config/kitty/kitty.conf" || {
+    ero="$(stamp) ERO ### kitty.conf konnte nicht kopiert werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
+
+  log="$(stamp) LOG ### init.lua Daten werden kopiert"
+  echo "$log"
+  logger -t bsd_sh "$log"
+  cp "/home/$user_name/git1/neovim/init.lua" "/home/$user_name/.config/nvim/init.lua" || {
+    ero="$(stamp) ERO ### init.lua konnte nicht kopiert werden"
+    echo "$ero"
+    logger -t bsd_sh "$ero"
+    exit 1
+  }
+
+  log="$(stamp) LOG ### nvim/lua/config/ werden kopiert"
+  echo "$log"
+  logger -t bsd_sh "$log"
   for file in "${nvim_config_files[@]}"; do
-    if [ ! -f "/home/$user_name/git1/config/$file" ]; then
-      echo "Fehler: $file existiert nicht in /home/$user_name/git1/config/" >>"$log_file" 2>>"$error_log_file"
-      check_error "Quelldatei $file fehlt"
-    else
-      mkdir -p "$HOME/.config/nvim/lua/config/"
-      echo "nvim config Ordner wurde erstllt"
-    fi
-    if [ -f "$HOME/.config/nvim/lua/config/$file" ]; then
-      mv "$HOME/.config/nvim/lua/config/$file" "$HOME/.config/nvim/lua/config/$file.bak" >>"$log_file" 2>>"$error_log_file"
-      echo "Backup von $file erstellt" >>"$log_file"
-    fi
-    cp "/home/$user_name/git1/config/$file" "$HOME/.config/nvim/lua/config/$file" >>"$log_file" 2>>"$error_log_file"
-    check_error "Kopieren von $file"
+    log="$(stamp) LOG ### $file wird kopiert"
+    echo "$log"
+    logger -t bsd_sh "$log"
+    cp "/home/$user_name/git1/neovim/$file" "/home/$user_name/.config/nvim/lua/config/$file" || {
+      ero="$(stamp) ERO ### $file konnte nicht kopiert werden"
+      echo "$ero"
+      logger -t bsd_sh "$ero"
+      exit 1
+    }
   done
-  if [ ! -f "/home/$user_name/git1/config/init.lua" ]; then
-    echo "Fehler: init.lua existiert nicht in /home/$user_name/git1/config/" >>"$log_file" 2>>"$error_log_file"
-    check_error "Quelldatei init.lua fehlt"
-  fi
-  if [ -f "$HOME/.config/nvim/init.lua" ]; then
-    mv "$HOME/.config/nvim/init.lua" "$HOME/.config/nvim/init.lua.bak" >>"$log_file" 2>>"$error_log_file"
-    echo "Backup von init.lua erstellt" >>"$log_file"
-  fi
-  cp "/home/$user_name/git1/config/init.lua" "$HOME/.config/nvim/init.lua" >>"$log_file" 2>>"$error_log_file"
-  check_error "Kopieren von init.lua"
 
-  # Hyprland-Dateien
-  for file in "${hypr_files[@]}"; do
-    if [ ! -f "/home/$user_name/git1/config/$file" ]; then
-      echo "Fehler: $file existiert nicht in /home/$user_name/git1/config/" >>"$log_file" 2>>"$error_log_file"
-      check_error "Quelldatei $file fehlt"
-    fi
-    if [ -f "$HOME/.config/hypr/$file" ]; then
-      mv "$HOME/.config/hypr/$file" "$HOME/.config/hypr/$file.bak" >>"$log_file" 2>>"$error_log_file"
-      echo "Backup von $file erstellt" >>"$log_file"
-    else
-      mkdir -p "$HOME/.config/hypr/"
-      echo "hypr Ordner wurde erstellt"
-    fi
-    cp "/home/$user_name/git1/config/$file" "$HOME/.config/hypr/$file" >>"$log_file" 2>>"$error_log_file"
-    check_error "Kopieren von $file"
+  log="$(stamp) LOG ### nvim/lua/plugins/ werden kopiert"
+  echo "$log"
+  logger -t bsd_sh "$log"
+  for file in "${nvim_plugin_files[@]}"; do
+    log="$(stamp) LOG ### $file wird kopiert"
+    echo "$log"
+    logger -t bsd_sh "$log"
+    cp "/home/$user_name/git1/neovim/$file" "/home/$user_name/.config/nvim/lua/plugins/$file" || {
+      ero="$(stamp) ERO ### $file konnte nicht kopiert werden"
+      echo "$ero"
+      logger -t bsd_sh "$ero"
+      exit 1
+    }
   done
 }
 
 #===== Netzwerkschnittstellen konfigurieren
-ipConfigRouter(){
+ipRouterConfig() {
   log="$(stamp) LOG ### rc.conf wird beschhrieben"
   echo "$log"
   logger -t bsd_sh "$log"
@@ -296,7 +364,7 @@ ifconfig_eno2="up"
 ifconfig_wlan1="up"
 
 # IP-Adrese fuer das LAN (auf Bridge setzen)
-ifconfig_bridge0_alias0="inet 10.10.10.1 netmask 255.255.255.0"
+ifconfig_bridge0_alias0="inet $routerIP netmask $netMask"
 
 # IP=Forwarding aktivieren
 gateway_enable="YES"
@@ -315,8 +383,42 @@ hostapd_flags="/usr/local/etc/hostapd.conf"
 EOL
 }
 
+ipSpeicherConfig() {
+  log="$(stamp) LOG ### rc.conf wird beschhrieben"
+  echo "$log"
+  logger -t bsd_sh "$log"
+
+  cat >>"$rcconf" <<EOL
+# Interet-Schnittstell (DHCP vom Provider)
+ifconfig_eno1="DHCP"
+
+# Bridge fuer LAN (eno2 + wlan1)
+cloned_interfaces="bridge0 wlan1"
+ifconfig_bridge0="addm eno2 addm wlan1 up"
+ifconfig_eno2="up"
+ifconfig_wlan1="up"
+
+# IP-Adrese fuer das LAN (auf Bridge setzen)
+ifconfig_bridge0_alias0="inet $speicher2IP netmask $netMask"
+
+# IP=Forwarding aktivieren
+gateway_enable="YES"
+
+# Firewall aktivieren
+pf_enable="YES"
+pf_rules="/etc/pf.conf"
+
+# DHCP aktivieren 
+dhcp_enable="YES"
+dhcp_ifaces="bridge0"
+
+# Wlan Accespoint aktivieren 
+hostapd_enable="YES"
+hostapd_flags="/usr/local/etc/hostapd.conf"
+EOL
+}
 #===== Firewall konfigurieren
-firewallConfigRouter(){
+firewallConfigRouter() {
   log="$(stamp) LOG ### pf.conf wird beschhrieben"
   echo "$log"
   logger -t bsd_sh "$log"
@@ -327,7 +429,7 @@ ext_if = "eno1"
 lan_if = "bridge0"
 
 # LAN-Subnetz
-lan_net = "10.10.10.0/24"
+lan_net = "$routerIP/24"
 
 # NAT: LAN -> WAN (masquerading)
 nat on $ext_if from $lan_net to any -> ($ext_if)
@@ -345,45 +447,45 @@ pass quick on $lan_if inet from $lan_net to any keep state
 pass in on $ext_if inet proto tcp from any to ($ext_if) flags S/SA keep state
 
 # Allow DHCP replies from WAN (optional, falls du DHCP client bist)
-pass in on $ext_if proto udp from any port 67 to any port 68 keep state
+pass in on $ext_if proto udp from any port $portDHCPfrom to any port $portDHCPto keep state
 
 # Allow DNS queries from LAN
-pass out on $ext_if proto udp from any to any port 53 keep state
-pass out on $ext_if proto tcp from any to any port 53 keep state
+pass out on $ext_if proto udp from any to any port $portDNS keep state
+pass out on $ext_if proto tcp from any to any port $portDNS keep state
 
 # Allow SSH
-pass in on $ext_if proto tcp from any to ($ext_if) port 22 keep state
-pass in on $lan_if proto tcp from any to any port 22 keep state
+pass in on $ext_if proto tcp from any to ($ext_if) port $portSSH keep state
+pass in on $lan_if proto tcp from any to any port 22 $portSSH state
 
 # Allow Samba 
-pass in on $lan_if proto tcp from any to any port {139, 445} keep state 
+pass in on $lan_if proto tcp from any to any port {$portSambafrom, $portSambato} keep state 
 EOL
 }
 
 #===== DHCP konfigurieren
-dhcpConfig(){
+dhcpConfig() {
   log="$(stamp) LOG ### dhcp.conf wird beschhrieben"
   echo "$log"
   logger -t bsd_sh "$log"
 
   cat >>"$dhcpconf" <<EOL
 option domain-name "home.local";
-option domain-name-servers 10.10.10.1, 1.1.1.1;
+option domain-name-servers $routerIP, 1.1.1.1;
 
 default-lease-time 600;
 max-lease-time 7200;
 
-subnet 10.10.10.0 netmask 255.255.255.0 {
+subnet 10.10.10.0 netmask $netMask {
   range 10.10.10.100 10.10.10.200;
-  option routers 10.10.10.1;
+  option routers $routerIP;
   option broadcast-address 10.10.10.255;
-  option subnet-mask 255.255.255.0;
+  option subnet-mask $netMask;
 }
 EOL
 }
 
 #===== WLan Accespoint konfigurieren
-wlanConfig(){
+wlanConfig() {
   log="$(stamp) LOG ### hostapd.conf wird beschhrieben"
   echo "$log"
   logger -t bsd_sh "$log"
@@ -391,19 +493,19 @@ wlanConfig(){
   cat >>"$hostapdconf" <<EOL
 interface=wlan1
 driver=bsd
-ssid=MeinHeimnetz
+ssid=$wpaID
 hw_mode=g
 channel=6
 auth_algs=1
 wpa=2
 wpa_key_mgmt=WPA-PSK
-wpa_passphrase=DeinSicheresPasswort
+wpa_passphrase=$wpaPW
 rsn_pairwise=CCMP
 EOL
 }
 
 #===== Samba einrichten
-sambaConfig(){
+sambaSpeicher1Config() {
   log="$(stamp) LOG ### smb4.conf wird beschrieben"
   echo "$log"
   logger -t bsd_sh "$log"
@@ -412,7 +514,7 @@ sambaConfig(){
 [global]
    workgroup = WORKGROUP
    server string = FreeBSD Samba Server
-   netbios name = FREESERVER
+   netbios name = Speicher1
    security = user
    map to guest = Bad User
    log file = /var/log/samba4/log.%m
@@ -438,9 +540,43 @@ sambaConfig(){
 EOL
 }
 
+sambaSpeicher2Config() {
+  log="$(stamp) LOG ### smb4.conf wird beschrieben"
+  echo "$log"
+  logger -t bsd_sh "$log"
+
+  cat >>"$sambaconf" <<EOL
+[global]
+   workgroup = WORKGROUP
+   server string = FreeBSD Samba Server
+   netbios name = Speicher2
+   security = user
+   map to guest = Bad User
+   log file = /var/log/samba4/log.%m
+   max log size = 50
+   dns proxy = no
+
+[public]
+   path = /srv/samba/public
+   public = yes
+   writable = yes
+   guest ok = yes
+   guest only = yes
+   create mask = 0775
+   directory mask = 0775
+
+[private]
+   path = /srv/samba/private
+   valid users = @users
+   guest ok = no
+   writable = yes
+   create mask = 0700
+   directory mask = 0700
+EOL
+}
 
 #===== Samba Verzeichnisse und Rechte anlegen
-sambaUser(){
+sambaUser() {
   log="$(stamp) LOG ### public Verzeiniss anlegen"
   echo "$log"
   logger -t bsd_sh "$log"
@@ -485,7 +621,7 @@ sambaUser(){
     ero="$(stamp) ERO ### Gruppe user konnte nicht angelegt werden"
     echo "$ero"
     logger -t bsd_sh "$ero"
-    exit 1 
+    exit 1
   }
 
   for user in "${users[@]}"; do
@@ -506,8 +642,8 @@ sambaUser(){
   log="$(stamp) LOG ### user werden in die Gruppe users hinzugefuegt"
   echo "$log"
   logger -t bsd_sh "$log"
-  for user in "${users{[@]}"; do 
-    pw groupmod users -m "$user" || { 
+  for user in "${users[@]}"; do
+    pw groupmod users -m "$user" || {
       ero="$(stamp) ERO ### Benutzer $user konnte nicht zur Gruppe hinzugefuegt werden"
       logger -t bsd_sh "$ero"
       exit 1
@@ -516,7 +652,7 @@ sambaUser(){
 }
 
 #===== SSH Konfiguration ändern
-sshConfig(){
+sshConfig() {
   log="$(stamp) LOG ### sshd_config wird angepasst"
   echo "$log"
   logger -t bsd_sh "$log"
@@ -526,7 +662,7 @@ sshConfig(){
   grep -q '^X11UseLocalhost' "$sshconf" || echo "X11UseLocalhost no" | tee -a "$sshconf"
 }
 
-startFirewall(){
+startFirewall() {
   log="$(stamp) LOG ### Firewall starten"
   echo "$log"
   logger -t bsd_sh "$log"
@@ -555,7 +691,7 @@ startFirewall(){
   }
 }
 
-startDhcp(){
+startDhcp() {
   log="$(stamp) LOG ### DHCP starten"
   echo "$log"
   logger -t bsd_sh "$log"
@@ -577,7 +713,7 @@ startDhcp(){
   }
 }
 
-startSsh(){
+startSsh() {
   log="$(stamp) LOG ### ssh starten"
   echo "$log"
   logger -t bsd_sh "$log"
@@ -599,7 +735,7 @@ startSsh(){
   }
 }
 
-startSamba(){
+startSamba() {
   log="$(stamp) LOG ### Samba starten"
   echo "$log"
   logger -t bsd_sh "$log"
@@ -621,7 +757,7 @@ startSamba(){
   }
 }
 
-startWlan(){
+startWlan() {
   log="$(stamp) LOG ### hostapd aktivieren"
   echo "$log"
   logger -t bsd_sh "$log"
@@ -633,7 +769,7 @@ startWlan(){
   }
 }
 
-startAntivir(){
+startAntivir() {
   log="$(stamp) LOG ### Antivirus aktivieren"
   echo "$log"
   logger -t bsd_sh "$log"
@@ -646,7 +782,7 @@ startAntivir(){
 }
 
 #===== Konfig ueberpruefen
-checkConfigRouter(){
+checkConfigRouter() {
   ifconfig || {
     ero="$(stamp) ERO ### ifconfig konnte nicht ausgefuehrt werden"
     echo "$ero"
@@ -669,59 +805,60 @@ checkConfigRouter(){
   }
 }
 
-main(){
-  # Zeitstempel 
+main() {
+  # Zeitstempel
   stamp
 
   # Logging einrichten
-  loggin 
-
-  # Als su anmelden 
-  rooting
+  loggin
 
   # erstes Update
   updates
 
-  # Bash einrichten 
-  setupBash
-
   # Installation von pkg Programmen
   installprog
 
-  # Installation von npm Programmen 
-  installnpm 
-  
+  # Installation von npm Programmen
+  installnpm
+
   # zweites Update
   updates
 
-  # Ordnerstruktur erstellen 
-  makeDir 
+  # Ordnerstruktur erstellen
+  makeDir
 
-  # Git Repos clonen 
-  gitClone 
+  # Git Repos clonen
+  gitClone
 
-  # Konfigurationsdateien kopieren 
-  confCopy 
+  # Konfigurationsdateien kopieren
+  gitCopy
 
-  # Setup Router 
-  ipConfigRouter
+  # Setup Router
+  ipRouterConfig
   firewallConfigRouter
-  dhcpConfig 
-  wlanConfig 
-  sambaConfig 
-  sambaUser 
-  sshConfig 
-  startFirewall 
-  startDhcp 
-  startSsh 
-  startSamba 
-  startWlan 
-  startAntivir 
+  dhcpConfig
+  wlanConfig
+  sambaSpeicher1Config
+  sambaUser
+  sshConfig
+  startFirewall
+  startDhcp
+  startSsh
+  startSamba
+  startWlan
+  startAntivir
 
   # Check Setup Router
   checkConfigRouter
 
-  # drittes Update 
-  updates 
-}
+  #  # Setup Speicher2
+  #  ipSpeicherConfig
+  #  sambaSpeicher2Config
+  #  sambaUser
+  #  sshConfig
+  #  startSsh
+  #  startSamba
 
+  # drittes Update
+  updates
+}
