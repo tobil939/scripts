@@ -7,11 +7,11 @@ prog1=(
   "neofetch"
   "python3"
   "npm"
-  "shellcheck"
+  "hs-ShellCheck"
   "shfmt"
   "isc-dhcp44-server"
   "clamav"
-  "samba413"
+  "samba420"
   "git"
   "iftop"
   "nload"
@@ -19,8 +19,6 @@ prog1=(
   "unbound"
   "smartmontools"
   "hostapd"
-  "pdbedit"
-
 )
 
 #===== Programme die mit NPM installiert werden
@@ -31,10 +29,8 @@ npmprog=(
 
 #===== Benutzer anlegen
 users=(
-  "user1"
-  "user2"
-  "user3"
-  "user4"
+  "speicher"
+  "tobil"
 )
 
 git_repo=(
@@ -72,11 +68,16 @@ user_name="$(whoami)"
 #===== Wlan Accespoint Konfiguration
 wpaID=""
 wpaPW=""
+lan_net="10.10.10.0/24"
+ext_if="eno1"
+lan_if="bridge0"
 
 #===== IP-Adrese
 netMask="255.255.255.0"
 routerIP="10.10.10.1"
 speicher2IP="10.10.10.2"
+ext_if="eno1"
+lan_if="bridge0"
 
 #===== Ports
 portDHCPfrom="67"
@@ -429,7 +430,7 @@ ext_if = "eno1"
 lan_if = "bridge0"
 
 # LAN-Subnetz
-lan_net = "$routerIP/24"
+lan_net = "10.10.10.0/24"
 
 # NAT: LAN -> WAN (masquerading)
 nat on $ext_if from $lan_net to any -> ($ext_if)
@@ -455,7 +456,7 @@ pass out on $ext_if proto tcp from any to any port $portDNS keep state
 
 # Allow SSH
 pass in on $ext_if proto tcp from any to ($ext_if) port $portSSH keep state
-pass in on $lan_if proto tcp from any to any port 22 $portSSH state
+pass in on $lan_if proto tcp from any to any port $portSSH keep state
 
 # Allow Samba 
 pass in on $lan_if proto tcp from any to any port {$portSambafrom, $portSambato} keep state 
@@ -520,6 +521,9 @@ sambaSpeicher1Config() {
    log file = /var/log/samba4/log.%m
    max log size = 50
    dns proxy = no
+   # Optional: Bind an spezifische IP, falls gewünscht
+   # interfaces = 192.168.1.100
+   # bind interfaces only = yes
 
 [public]
    path = /srv/samba/public
@@ -529,6 +533,9 @@ sambaSpeicher1Config() {
    guest only = yes
    create mask = 0775
    directory mask = 0775
+   # Optional: Besitzer und Gruppe für bessere Kontrolle
+   force user = nobody
+   force group = nogroup
 
 [private]
    path = /srv/samba/private
@@ -537,8 +544,10 @@ sambaSpeicher1Config() {
    writable = yes
    create mask = 0700
    directory mask = 0700
-EOL
-}
+   # Optional: Besitzer und Gruppe für bessere Kontrolle
+   force user = youruser
+   force group = users
+EOL}
 
 sambaSpeicher2Config() {
   log="$(stamp) LOG ### smb4.conf wird beschrieben"
@@ -862,3 +871,5 @@ main() {
   # drittes Update
   updates
 }
+
+main
