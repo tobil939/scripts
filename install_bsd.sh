@@ -29,8 +29,6 @@ npmprog=(
 
 #===== Benutzer anlegen
 users=(
-  "speicher"
-  "tobil"
 )
 
 git_repo=(
@@ -63,21 +61,20 @@ nvim_config_files=(
   "options.lua"
 )
 
-user_name="$(whoami)"
+user_name=""
 
 #===== Wlan Accespoint Konfiguration
 wpaID=""
 wpaPW=""
 lan_net="10.10.10.0/24"
-ext_if="eno1"
+ext_if="em0"
 lan_if="bridge0"
+wlan_dev="iwm0"
 
 #===== IP-Adrese
 netMask="255.255.255.0"
 routerIP="10.10.10.1"
 speicher2IP="10.10.10.2"
-ext_if="eno1"
-lan_if="bridge0"
 
 #===== Ports
 portDHCPfrom="67"
@@ -356,13 +353,13 @@ ipRouterConfig() {
 
   cat >>"$rcconf" <<EOL
 # Interet-Schnittstell (DHCP vom Provider)
-ifconfig_eno1="DHCP"
+ifconfig_em0="DHCP"
 
-# Bridge fuer LAN (eno2 + wlan1)
-cloned_interfaces="bridge0 wlan1"
-ifconfig_bridge0="addm eno2 addm wlan1 up"
-ifconfig_eno2="up"
-ifconfig_wlan1="up"
+# Bridge fuer LAN (em0 + iwm0)
+cloned_interfaces="bridge0 re0 iwm0"
+ifconfig_bridge0="addm re0 addm iwm0 up"
+ifconfig_re0="up"
+ifconfig_iwm0="up"
 
 # IP-Adrese fuer das LAN (auf Bridge setzen)
 ifconfig_bridge0_alias0="inet $routerIP netmask $netMask"
@@ -391,13 +388,13 @@ ipSpeicherConfig() {
 
   cat >>"$rcconf" <<EOL
 # Interet-Schnittstell (DHCP vom Provider)
-ifconfig_eno1="DHCP"
+ifconfig_em0="DHCP"
 
-# Bridge fuer LAN (eno2 + wlan1)
-cloned_interfaces="bridge0 wlan1"
-ifconfig_bridge0="addm eno2 addm wlan1 up"
-ifconfig_eno2="up"
-ifconfig_wlan1="up"
+# Bridge fuer LAN (em0 + iwm0)
+cloned_interfaces="bridge0 re0 iwm0"
+ifconfig_bridge0="addm re0 addm iwm0 up"
+ifconfig_re0="up"
+ifconfig_iwm0="up"
 
 # IP-Adrese fuer das LAN (auf Bridge setzen)
 ifconfig_bridge0_alias0="inet $speicher2IP netmask $netMask"
@@ -426,11 +423,11 @@ firewallConfigRouter() {
 
   cat >>"$pfconf" <<EOL
 # Interfaces
-ext_if = "eno1"
-lan_if = "bridge0"
+#ext_if = "eno1"
+#lan_if = "bridge0"
 
 # LAN-Subnetz
-lan_net = "10.10.10.0/24"
+#lan_net = "10.10.10.0/24"
 
 # NAT: LAN -> WAN (masquerading)
 nat on $ext_if from $lan_net to any -> ($ext_if)
@@ -492,7 +489,7 @@ wlanConfig() {
   logger -t bsd_sh "$log"
 
   cat >>"$hostapdconf" <<EOL
-interface=wlan1
+interface=$wlan_dev
 driver=bsd
 ssid=$wpaID
 hw_mode=g
