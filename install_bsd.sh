@@ -8,7 +8,7 @@ pkg_programme=(
   "sudo"
   "bash"
   "nano"
-  "zfs"
+  "openzfs"
   "neovim"
   "kitty"
   "neofetch"
@@ -33,7 +33,13 @@ npm_programme=(
   "tree-sitter"
 )
 
-router_benutzer=(alice bob)
+WlanName="MeinHeimNetz"
+WlanPW="1234"
+
+router_benutzer=(
+  "alice"
+  "lbob"
+)
 
 #=======================#
 #      FUNKTIONEN       #
@@ -46,6 +52,10 @@ log() {
 fail() {
   echo "[ERROR] $1"
   exit 1
+}
+
+warn() {
+  echo -e "\33[1;33mWARNUNG:\033[0m $1" >&2
 }
 
 install_pkg_programme() {
@@ -79,7 +89,13 @@ setup_netwerk() {
   log "Netzwerkschnittstellen konfigurieren ..."
   sysrc ifconfig_em0="DHCP"
   sysrc ifconfig_re0="inet 10.10.10.1 netmask 255.255.255.0"
-  sysrc ifconfig_iwm0="inet 10.10.10.2 netmask 255.255.255.0"
+  ifconfig re0 inet 10.10.10.1 netmask 255.255.255.0
+  if ifconfig iwm0 >/dev/null 2>&1; then
+    sysrc ifconfig_iwm0="inet 10.10.10.2 netmask 255.255.255.0"
+    ifconfig iwm0 inet 10.10.10.2 netmask 255.255.255.0
+  else
+    warn "iwm0 nicht gefunden – WLAN wird übersprungen"
+  fi
 }
 
 setup_dhcp() {
@@ -110,7 +126,7 @@ setup_firewall_pf() {
 
   cat <<EOF >/etc/pf.conf
 ext_if = "em0"
-lan_if = "bridge0"
+lan_if = "re0"
 lan_net = "10.10.10.0/24"
 
 nat on \$ext_if from \$lan_net to any -> (\$ext_if)
@@ -148,12 +164,12 @@ create_hostapd_conf() {
   log "Erstelle /usr/local/etc/hostapd.conf ..."
   cat <<EOF >/usr/local/etc/hostapd.conf
 interface=iwm0
-ssid=FreeBSD-AP
+ssid=$WlanName
 hw_mode=g
 channel=6
 auth_algs=1
 wpa=2
-wpa_passphrase=MeinGeheimesPasswort
+wpa_passphrase=$WlanPW 
 wpa_key_mgmt=WPA-PSK
 rsn_pairwise=CCMP
 EOF
@@ -183,14 +199,24 @@ create_smb4_conf() {
 EOF
 }
 
+stop_services() {
+  log "Stoppe alle Dienste ..."
+  service pf stop || warn "pf konnte nicht gestoppt werden"
+  service isc-dhcpd stop || warn "DHCP konnte nicht gestoppt werden"
+  service sshd stop || warn "sshd konnte nicht gestoppt werden"
+  service samba_server stop || warn "Samba konnte nicht gestoppt werden"
+  service hostapd stop || warn "hostapd konnte nicht gestoppt werden"
+  service clamav-clamd stop || warn "ClamAV konnte nicht gestoppt werden"
+}
+
 start_services() {
   log "Starte alle Dienste ..."
-  service pf start || fail "pf konnte nicht gestartet werden"
-  service isc-dhcpd start || fail "DHCP konnte nicht gestartet werden"
-  service sshd start || fail "sshd konnte nicht gestartet werden"
-  service samba_server start || fail "Samba konnte nicht gestartet werden"
-  service hostapd start || fail "hostapd konnte nicht gestartet werden"
-  service clamav-clamd start || fail "ClamAV konnte nicht gestartet werden"
+  service pf start || warn "pf konnte nicht gestartet werden"
+  service isc-dhcpd start || warn "DHCP konnte nicht gestartet werden"
+  service sshd start || warn "sshd konnte nicht gestartet werden"
+  service samba_server start || warn "Samba konnte nicht gestartet werden"
+  service hostapd start || warn "hostapd konnte nicht gestartet werden"
+  service clamav-clamd start || warn "ClamAV konnte nicht gestartet werden"
 }
 
 #=======================#
@@ -206,12 +232,14 @@ main() {
   create_dhcpd_conf
   create_hostapd_conf
   create_smb4_conf
+  stop_services
   setup_dhcp
   setup_ssh
   setup_wlan_ap
   setup_samba
   setup_firewall_pf
   setup_clamav
+  stop_services
   start_services
 }
 
