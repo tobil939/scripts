@@ -460,16 +460,6 @@ conffuzzy() {
     [[ -n "$file" ]] && nvim "$file"}" >>~/.bashrc || exit 20
 }
 
-hidrivekey() {
-  get_timestamp
-  echo "$timestamp creating key, has to be copied" | tee -a "$logfile"
-  ssh-keygen -t ed25519 -C "hidrive" -f ~/.ssh/hidrive_key || exit 21
-  echo "$timestamp copie it in bashrc" | tee -a "$logfile"
-  echo "{
-  sshfs harddisk-5820@sftp.hidrive.strato.com:/users/harddisk-5820 ~/hidrive -o IdentityFile=~/.ssh/hidrive_key
-}" >>~/.bashrc || exit 21
-}
-
 confdarkmode() {
   get_timestamp
   echo "$timestamp setting up dark mode" | tee -a "$logfile"
@@ -508,7 +498,6 @@ makedir
 clonegit
 copieconf
 conffuzzy
-hidrivekey
 confdarkmode
 confblue
 
