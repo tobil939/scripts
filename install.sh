@@ -9,7 +9,7 @@ deathtime="180s"
 warntime="170s"
 
 username=$(logname)
-user="/home/$username/"
+user="/home/$username"
 
 # Installlist Pacman
 progpac=(
@@ -17,13 +17,12 @@ progpac=(
   "hyprland"
   "xorg"
   "network-manager-applet"
-  #"texlive"
-  #"texmaker"
   "gnome-calendar"
   "git"
   "github-cli"
   "python3"
   "nodejs"
+  "node-gyp"
   "stylua"
   "shfmt"
   "clang"
@@ -39,12 +38,17 @@ progpac=(
   "cppcheck"
   "qutebrowser"
   "arm-none-eabi-gdb"
-  "texlab"
-  "texlive-binextra"
   "perl-yaml-tiny"
   "perl-file-homedir"
   "shellcheck"
   "base-devel"
+)
+
+progpacnowatchdog=(
+  "texlive"
+  "texmaker"
+  "texlab"
+  "texlive-binextra"
 )
 
 progyay=(
@@ -58,7 +62,6 @@ progyay=(
   "pavucontrol"
   "qt5-wayland"
   "qt6-wayland"
-  "neofetch"
   "kitty"
   "firefox"
   "gedit"
@@ -69,7 +72,6 @@ progyay=(
   "gtk2"
   "gtk3"
   "gtk4"
-  "arc-gtk-theme"
   "gtk-engine-murrine"
   "lxappearance"
   "evince"
@@ -85,6 +87,11 @@ progyay=(
   "evolution"
   "lua-language-server"
   "bash-language-server"
+)
+
+progyaynosudo=(
+  "neofetch"
+  "arc-gtk-theme"
 )
 
 proglang=(
@@ -312,26 +319,32 @@ installpacman() {
     echo "$timestamp $prog will be installed" | tee -a "$logfile"
     watchdog pacman -S "$prog" --needed --noconfirm || exit 4
   done
+
+  for prog in "${progpacnowatchdog[@]}"; do
+    get_timestamp
+    echo "$timestamp $prog will be installed without watchdog" | tee -a "$logfile"
+    pacman -S "$prog" --needed --noconfirm || exit 4
+  done
 }
 
 installyay() {
   get_timestamp
   echo "$timestamp yay will be installed" | tee -a "$logfile"
-  mkdir -p "$user/yay" || exit 7
-  cd "$user/yay" || exit 7
-  if [[ -d "$user/yay" ]]; then
-    echo "$timestamp yay will be cloned from git" | tee -a "$logfile"
-    sudo -u "$username" git clone https://aur.archlinux.org/yay.git || exit 7
-    echo "$timestamp yay pac will be created" | tee -a "$logfile"
-    sudo -u "$username" makepkg -si --noconfirm || exit 7
-    cd "$user" || exit 7
-  else
-    echo "$timestamp something went wrong installing yay" | tee -a "$logfile"
-    exit 7
+  echo "$timestamp pacman --needed git and base-devel are installed" | tee -a "$logfile"
+  sudo pacman -S --needed --noconfirm git base-devel
+  echo "$timestamp changing into $user" | tee -a "$logfile"
+  cd "$user" || exit 7
+  echo "$timestamp if yay does not exists, git clone" | tee -a "$logfile"
+  if [[ ! -d "yay" ]]; then
+    sudo -u "$username" git clone https://aur.archlinux.org/yay.git
   fi
-
-  echo "$timestamp change into $user/Downloads" | tee -a "$logfile"
-  cd "$user/Downloads" || exit 7
+  get_timestamp
+  echo "$timestamp changing into yay" | tee -a "$logfile"
+  cd yay || exit 7
+  sudo -u "$username" makepkg -si --noconfirm --needed || exit 7
+  get_timestamp
+  echo "$timestamp changing back to $user" | tee -a "$logfile"
+  cd "$user" || exit 7
 
   get_timestamp
   echo "$timestamp yay pac will be installed" | tee -a "$logfile"
@@ -339,24 +352,32 @@ installyay() {
   for prog in "${progyay[@]}"; do
     get_timestamp
     echo "$timestamp $prog will be installed" | tee -a "$logfile"
+    yay -S "$prog" --needed --noconfirm || exit 7
+  done
+
+  get_timestamp
+  echo "$timestamp yay without root  will be installed" | tee -a "$logfile"
+
+  for prog in "${progyaynosudo[@]}"; do
+    get_timestamp
+    echo "$timestamp $prog will be installed" | tee -a "$logfile"
     sudo -u "$username" yay -S "$prog" --needed --noconfirm || exit 7
   done
 }
 
 installnpm() {
-  rootcheck
   get_timestamp
   echo "$timestamp npm pac will be installed" | tee -a "$logfile"
   echo "$timestamp tree-sitter will be installed" | tee -a "$logfile"
-  npm install -g tree-sitter --silent || exit 8
+  #npm install -g tree-sitter --silent --verbose || exit 8
 
   get_timestamp
   echo "$timestamp tree-sitter-cli will be installed" | tee -a "$logfile"
-  npm install -g tree-sitter-cli --silent || exit 8
+  npm install -g tree-sitter-cli --silent --verbose || exit 8
 
   get_timestamp
   echo "$timestamp prettier will be installed" | tee -a "$logfile"
-  npm install -g prettier --silent || exit 8
+  npm install -g prettier --silent --verbose || exit 8
 }
 
 watchdog() {
@@ -379,7 +400,7 @@ makedir() {
   for prog in "${proglang[@]}"; do
     get_timestamp
     echo "$timestamp creating directories $prog" | tee -a "$logfile"
-    mkdir -p "$user/Prog/$prog" "$user/Doku/$prog" "$user/Git/$prog" || exit 9
+    sudo -u "$username" mkdir -p "$user/Prog/$prog" "$user/Doku/$prog" "$user/Git/$prog" || exit 9
   done
 
   get_timestamp
@@ -387,7 +408,7 @@ makedir() {
   for dirs in "${homedirs[@]}"; do
     get_timestamp
     echo "$timestamp creating directories $dirs" | tee -a "$logfile"
-    mkdir -p "$user/$dirs" || exit 10
+    sudo -u "$username" mkdir -p "$user/$dirs" || exit 10
   done
 
   get_timestamp
@@ -395,7 +416,7 @@ makedir() {
   for dirs in "${git_repo[@]}"; do
     get_timestamp
     echo "$timestamp creating directories $dirs" | tee -a "$logfile"
-    mkdir -p "$user/git1/$dirs" || exit 11
+    sudo -u "$username" mkdir -p "$user/git1/$dirs" || exit 11
   done
 
   get_timestamp
@@ -403,7 +424,7 @@ makedir() {
   for dirs in "${confdirs[@]}"; do
     get_timestamp
     echo "$timestamp creating directories $dirs" | tee -a "$logfile"
-    mkdir -p "$dirs" || exit 12
+    sudo -u "$username" mkdir -p "$dirs" || exit 12
   done
 }
 
@@ -412,9 +433,14 @@ clonegit() {
   echo "$timestamp git repos will be cloned" | tee -a "$logfile"
   echo "$user"
   for repo in "${git_repo[@]}"; do
-    get_timestamp
-    echo "$timestamp clone $repo" | tee -a "$logfile"
-    sudo -u "$username" watchdog git clone "https://github.com/tobil939/$repo.git" "$user/git1/$repo" || exit 13
+    repo_url="https://github.com/tobil939/$repo.git"
+    target_dir="$user/git1/$repo"
+
+    if [[ -d "$target_dir/.git" ]]; then
+      echo "$timestamp $repo already cloned" | tee -a "$logfile"
+    else
+      sudo -u "$username" git clone --depth=1 "$repo_url" "$target_dir" || exit 13
+    fi
   done
 }
 
@@ -427,7 +453,7 @@ copieconf() {
   echo "$timestamp init.lua wll be copied" | tee -a "$logfile"
   cp "$fromdir/init.lua" "$todir/init.lua"
   if [[ ! -f "$todir/init.lua" ]]; then
-    echo "$timestamp init.lua was noch copied"
+    echo "$timestamp init.lua was not copied"
   fi
 
   get_timestamp
@@ -478,23 +504,63 @@ copieconf() {
 conffuzzy() {
   get_timestamp
   echo "$timestamp config fuzzyfind" | tee -a "$logfile"
-  echo "fuzzy(){
-    local file 
-    file=$(find . -type f | fzf -- preview 'cat {}' --height 80% --border)
-    [[ -n "$file" ]] && nvim "$file"}" >>"$user/.bashrc" || exit 20
+  if ! grep -q fuzzy ~/.bashrc; then
+    cat >>"$user/.bashrc" <<'EOF'
+export GREP_COLORS='mt=1;35'
+export LS_COLORS="di=1;35:fi=0:ln=36"
+
+alias grep='grep --color=auto'
+alias ls='ls --color=auto'
+alias sl='ls -lh --color=auto'
+
+fuzzy() {
+  local file
+  file=$(find . -type f | fzf --preview 'cat {}' --height 80% --border)
+  [[ -n "$file" ]] && nvim "$file"
+}
+EOF
+  fi
+}
+
+get_dbus_address() {
+  get_timestamp
+
+  pid=$(pgrep -u "$username" gnome-session | head -n 1)
+  if [[ -z "$pid" ]]; then
+    echo "$timestamp Fehler: Keine gnome-session für $username gefunden." | tee -a "$logfile"
+    return 1
+  fi
+
+  DBUS_SESSION_BUS_ADDRESS=$(grep -z DBUS_SESSION_BUS_ADDRESS /proc/"$pid"/environ | sed -e 's/DBUS_SESSION_BUS_ADDRESS=//')
+  if [[ -z "$DBUS_SESSION_BUS_ADDRESS" ]]; then
+    echo "$timestamp Fehler: Konnte DBUS_SESSION_BUS_ADDRESS nicht auslesen." | tee -a "$logfile"
+    return 1
+  fi
+
+  export DBUS_SESSION_BUS_ADDRESS
 }
 
 confdarkmode() {
   get_timestamp
-  echo "$timestamp setting up dark mode" | tee -a "$logfile"
+  echo "$timestamp Setting up dark mode..." | tee -a "$logfile"
+
   if command -v gsettings >/dev/null; then
-    gsettings set org.gnome.desktop.interface gtk-theme "Arc-Dark" || exit 22
-    gsettings set org.gnome.desktop.interface icon-theme "Adwaita" || exit 22
-    gsettings set org.gnome.shell.extensions.user-theme name "Adwaita" || exit 22
-    gsettings set org.gnome.desktop.interface color-scheme prefer-dark || exit 22
-    echo "$timestamp activating Dark Mode" | tee -a "$logfile"
+    get_dbus_address
+
+    themes=(
+      'org.gnome.desktop.interface gtk-theme "Arc-Dark"'
+      'org.gnome.desktop.interface icon-theme "Adwaita"'
+      'org.gnome.shell.extensions.user-theme "Adwaita"'
+      'org.gnome.desktop.interface color-scheme "prefer-dark"'
+    )
+
+    for setting in "${themes[@]}"; do
+      sudo -u "$username" DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" gsettings set "$setting"
+    done
+
+    echo "$timestamp Dark Mode aktiviert" | tee -a "$logfile"
   else
-    echo "GNOME nicht gefunden, Dark Mode wird übersprungen" | tee -a "$logfile"
+    echo "$timestamp GNOME nicht gefunden, Dark Mode wird übersprungen" | tee -a "$logfile"
   fi
 }
 
