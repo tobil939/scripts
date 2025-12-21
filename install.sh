@@ -69,13 +69,8 @@ progyay=(
   "picom"
   "feh"
   "nautilus"
-  "gtk2"
-  "gtk3"
-  "gtk4"
-  "gtk-engine-murrine"
   "lxappearance"
   "evince"
-  "nitrogen"
   "neovim"
   "gdb"
   "npm"
@@ -92,6 +87,12 @@ progyay=(
 progyaynosudo=(
   "neofetch"
   "arc-gtk-theme"
+  "gtk2"
+  "gtk3"
+  "gtk4"
+  "gtk-engine-murrine"
+  "nitrogen"
+  "google-chrome"
 )
 
 proglang=(
