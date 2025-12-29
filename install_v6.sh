@@ -1,89 +1,53 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Sicherheitschecks
-if ! command -v sudo >/dev/null; then
-  echo "sudo ist nicht installiert. Skript wird abgebrochen."
-  exit 1
-fi
+# bash-script for initialisation of bluetooth devices
+# rev. 2.0
+# includes basic error handling and improved messages
 
-# Benutzername und Log-Dateien
-user_name=$(whoami)
-log_file="/home/$user_name/Log/install.txt"
-error_log_file="/home/$user_name/Log/errorinstall.txt"
-datef="$(date '+%Y-%m-%d %H:%M:%S')"
-mkdir -p "/home/$user_name/Log/"
-touch "$log_file" "$error_log_file"
-if [ ! -w "$log_file" ] || [ ! -w "$error_log_file" ]; then
-  echo "Keine Schreibrechte für Log-Dateien. Skript wird abgebrochen."
-  exit 1
-fi
-echo -e "\n $datef Benutzername: $user_name \n" >>"$log_file" 2>>"$error_log_file"
+# Variabesl
+deathtime="180s"
+warntime="170s"
 
-# Fehlerprüfungsfunktion
-check_error() {
-  if [ $? -ne 0 ]; then
-    echo "Fehler bei $1. Skript wird abgebrochen." | tee -a "$log_file"
-    notify-send "Fehler bei $1"
-    exit 1
-  fi
-}
+username=$(logname)
+user="/home/$username"
 
-# Erstes Update
-echo -e "Erstes Update"
-notify-send "pacman Update"
-sudo pacman -Syu --noconfirm archlinux-keyring >>"$log_file" 2>>"$error_log_file"
-check_error "System-Update"
-
-# Paketlisten
+# Installlist Pacman
 progpac=(
   "wayland"
   "hyprland"
   "xorg"
   "network-manager-applet"
-  "texlive"
-  "texmaker"
   "gnome-calendar"
+  "git"
+  "github-cli"
   "python3"
-  "python-numba"
-  "python-dask"
-  "python-pandas"
-  "python-numpy"
-  "python-openpyxl"
-  "python-black"
-  "python-flake8"
-  "python-debugpy"
-  "python-pylint"
-  "pyright"
   "nodejs"
+  "node-gyp"
   "stylua"
   "shfmt"
   "clang"
   "lldb"
   "fzf"
-  "go"
   "lua"
-  "gopls"
   "gcc"
   "cmake"
   "make"
-  "cppcheck"
-  "base-devel"
   "ripgrep"
   "luacheck"
   "cppcheck"
-  "shellcheck"
-  "ncurses"
-  "libffi"
-  "gmp"
   "qutebrowser"
   "arm-none-eabi-gdb"
-  "lua-language-server"
-  "bash-language-server"
-  "texlab"
-  "texlive-binextra"
   "perl-yaml-tiny"
   "perl-file-homedir"
   "shellcheck"
+  "base-devel"
+)
+
+progpacnowatchdog=(
+  "texlive"
+  "texmaker"
+  "texlab"
+  "texlive-binextra"
 )
 
 progyay=(
@@ -97,26 +61,15 @@ progyay=(
   "pavucontrol"
   "qt5-wayland"
   "qt6-wayland"
-  "neofetch"
   "kitty"
   "firefox"
   "gedit"
   "ttf-meslo-nerd"
   "picom"
   "feh"
-  "git"
-  "github-cli"
   "nautilus"
-  "dolphin"
-  "timeshift"
-  "gtk2"
-  "gtk3"
-  "gtk4"
-  "arc-gtk-theme"
-  "gtk-engine-murrine"
   "lxappearance"
   "evince"
-  "nitrogen"
   "neovim"
   "gdb"
   "npm"
@@ -127,21 +80,48 @@ progyay=(
   "gdbgui"
   "evolution"
   "lua-language-server"
-  "bashdb"
   "bash-language-server"
+)
+
+progyaynosudo=(
+  "neofetch"
+  "arc-gtk-theme"
+  "gtk2"
+  "gtk3"
+  "gtk4"
+  "gtk-engine-murrine"
+  "nitrogen"
+  "google-chrome"
 )
 
 proglang=(
   "lua"
   "clang"
-  "py"
+  "cpp"
   "bash"
 )
 
+homedirs=(
+  "git"
+  "git1"
+  "Scripts"
+)
+
 git_repo=(
-  "config"
   "scripts"
+  "Clang"
+  "neovim"
+  "config"
   "RP2040"
+)
+
+confdirs=(
+  "$user/.config/nvim/lua/config"
+  "$user/.config/nvim/lua/plugins"
+  "$user/.config/hypr"
+  "$user/.config/waybar"
+  "$user/.config/kitty"
+  "$user/.config/qutebrowser"
 )
 
 nvim_plugin_files=(
@@ -179,279 +159,469 @@ waybar_files=(
   "config.jsonc"
 )
 
-# Installation von pacman-Paketen
-echo -e "\n ------------------------------------"
-echo -e "Installiere Programme mit pacman"
-notify-send "pacman-Pakete werden installiert"
-sudo pacman -S --needed --noconfirm "${progpac[@]}" >>"$log_file" 2>>"$error_log_file"
-check_error "Installation von pacman-Paketen"
+qute_files=(
+  "config.py"
+)
 
-# Installation von yay
-echo -e "\n ------yay------"
-notify-send "yay wird installiert"
-sudo pacman -S --needed --noconfirm git base-devel >>"$log_file" 2>>"$error_log_file"
-check_error "Installation von git und base-devel"
-cd /home/$user_name
-if [ ! -d "yay" ]; then
-  git clone https://aur.archlinux.org/yay.git >>"$log_file" 2>>"$error_log_file"
-  check_error "Klonen von yay"
-fi
-cd yay
-makepkg -si --noconfirm >>"$log_file" 2>>"$error_log_file"
-check_error "Installation von yay"
-cd /home/$user_name
+kitty_files=(
+  "kitty.conf"
+)
 
-# Installation von yay-Paketen
-echo -e "\n ------------------------------------"
-echo -e "Installiere Programme mit yay"
-notify-send "yay-Pakete werden installiert"
-for pkg in "${progyay[@]}"; do
-  echo -e "Installiere $pkg"
-  yay -S --noconfirm "$pkg" >>"$log_file" 2>>"$error_log_file"
-  if [ $? -ne 0 ]; then
-    echo "Warnung: Installation von $pkg fehlgeschlagen. Fahre mit nächstem Paket fort." >>"$log_file"
-  fi
-done
+# logging
+# place where the logfile will be saved
+logfile="/var/log/install_setup.log"
+logfilename=$(basename "$logfile")
 
-# npm-Pakete
-echo -e "\n ------npm------"
-notify-send "npm-Pakete werden installiert"
-sudo npm install -g tree-sitter --silent >>"$log_file" 2>>"$error_log_file"
-sudo npm install -g tree-sitter-cli --silent >>"$log_file" 2>>"$error_log_file"
-sudo npm install -g matlab-language-server --silent >>"$log_file" 2>>"$error_log_file"
-sudo npm install -g prettier --silent >>"$log_file" 2>>"$error_log_file"
-check_error "Installation von npm-Paketen"
+# timestamp
+get_timestamp() {
+  timestamp=$(date +"%Y-%m-%d_%H:%M:%S")
+}
 
-#Go-Tools
-echo -e "\n ------Go------"
-notify-send "Go-Tools werden installiert"
-go install golang.org/x/tools/gopls@latest >>"$log_file" 2>>"$error_log_file"
-go install github.com/segmentio/golines@latest >>"$log_file" 2>>"$error_log_file"
-check_error "Installation von Go-Tools"
-
-# Ordnererstellung
-echo -e "\n ------------------------------------"
-echo -e "Ordner werden erstellt"
-notify-send "Ordner werden erstellt"
-cd /home/$user_name
-for prog in "${proglang[@]}"; do
-  echo -e "Erstelle Ordner für $prog"
-  mkdir -p "/home/$user_name/Prog/$prog" "/home/$user_name/Doku/$prog" "/home/$user_name/Git/$prog" "/home/$user_name/Doku/latex/prog/$prog" >>"$log_file" 2>>"$error_log_file"
-done
-mkdir -p "/home/$user_name/Git/config/" "/home/$user_name/Git/scripts" >>"$log_file" 2>>"$error_log_file"
-mkdir -p "/home/$user_name/Log" "/home/$user_name/Scripts" "/home/$user_name/git1/config" "/home/$user_name/git1/scripts" "/home/$user_name/git1/RP2040" >>"$log_file" 2>>"$error_log_file"
-mkdir -p "$HOME/.config/nvim/lua/config" "$HOME/.config/nvim/lua/plugins" "$HOME/.config/hypr" "$HOME/.config/waybar" "$HOME/.config/kitty" "$HOME/.config/qutebrowser" >>"$log_file" 2>>"$error_log_file"
-check_error "Ordnererstellung"
-
-# Git-Repositories klonen
-echo -e "\n ------Dateien klonen------"
-notify-send "Dateien werden geklont"
-for repo in "${git_repo[@]}"; do
-  echo "$repo" >>"$log_file" 2>>"$error_log_file"
-  git clone "https://github.com/tobil939/$repo.git" "/home/$user_name/git1/$repo" >>"$log_file" 2>>"$error_log_file"
-  echo "https://github.com/tobil939/$repo.git" >>"$log_file" 2>>"$error_log_file"
-  echo "/home/$user_name/git1/$repo" >>"$log_file" 2>>"$error_log_file"
-  check_error "Klonen von $repo" >>"$log_file" 2>>"$error_log_file"
-done
-
-# Dateien aus tobil939/config kopieren
-echo -e "\n ------Daten kopieren (config)------"
-notify-send "Konfigurationsdateien werden kopiert"
-cd /home/$user_name/git1/config
-check_error "Wechseln in config-Verzeichnis"
-
-# Neovim-Dateien
-for file in "${nvim_plugin_files[@]}"; do
-  if [ ! -f "/home/$user_name/git1/config/$file" ]; then
-    echo "Fehler: $file existiert nicht in /home/$user_name/git1/config/" >>"$log_file" 2>>"$error_log_file"
-    check_error "Quelldatei $file fehlt"
-  fi
-  if [ -f "$HOME/.config/nvim/lua/plugins/$file" ]; then
-    sudo mv "$HOME/.config/nvim/lua/plugins/$file" "$HOME/.config/nvim/lua/plugins/$file.bak" >>"$log_file" 2>>"$error_log_file"
-    echo "Backup von $file erstellt" >>"$log_file"
+logging() {
+  if [[ -f "$logfile" ]]; then
+    echo "logfile exists"
   else
-    mkdir -p "$HOME/.config/nvim/lua/plugins/"
-    echo "nvim plugins Ordner wurde ertellt"
+    echo "logfile will be created"
+    touch "$logfile" || exit 1
   fi
-  sudo cp "/home/$user_name/git1/config/$file" "$HOME/.config/nvim/lua/plugins/$file" >>"$log_file" 2>>"$error_log_file"
-  check_error "Kopieren von $file"
-done
-for file in "${nvim_config_files[@]}"; do
-  if [ ! -f "/home/$user_name/git1/config/$file" ]; then
-    echo "Fehler: $file existiert nicht in /home/$user_name/git1/config/" >>"$log_file" 2>>"$error_log_file"
-    check_error "Quelldatei $file fehlt"
-  else
-    mkdir -p "$HOME/.config/nvim/lua/config/"
-    echo "nvim config Ordner wurde erstllt"
+
+  get_timestamp
+  [[ -f "$logfile" ]] || exit 1
+  echo "$timestamp first entry" | tee -a "$logfile" || exit 1
+}
+
+# errorhandling
+# better errormessages
+handling() {
+  local error="$1"
+  get_timestamp
+  case $error in
+    0)
+      echo "$timestamp Alles lief erfolgreich, keine Fehler." | tee -a "$logfile"
+      echo "$timestamp Logfile wird nach /tmp verschoben." | tee -a "$logfile"
+      mv -v "$logfile" "/tmp/$logfilename"
+      ;;
+    1)
+      echo "$timestamp Fehler: Logfile konnte nicht erstellt oder beschrieben werden." | tee -a "$logfile"
+      ;;
+    2)
+      echo "$timestamp Fehler: Skript muss als root oder mit sudo ausgeführt werden." | tee -a "$logfile"
+      ;;
+    3)
+      echo "$timestamp Fehler: Arch Keyring Update fehlgeschlagen." | tee -a "$logfile"
+      ;;
+    4)
+      echo "$timestamp Fehler: Pacman Update oder Paketinstallation fehlgeschlagen." | tee -a "$logfile"
+      ;;
+    5)
+      echo "$timestamp Fehler: Yay Update oder Installation fehlgeschlagen." | tee -a "$logfile"
+      ;;
+    6)
+      echo "$timestamp Fehler: NPM Update oder Installation globaler Pakete fehlgeschlagen." | tee -a "$logfile"
+      ;;
+    7)
+      echo "$timestamp Fehler: AUR Paketinstallation über Yay fehlgeschlagen." | tee -a "$logfile"
+      ;;
+    8)
+      echo "$timestamp Fehler: NPM globale Packages Installation fehlgeschlagen." | tee -a "$logfile"
+      ;;
+    9)
+      echo "$timestamp Fehler: Verzeichnisse für Programm-Ordner konnten nicht erstellt werden." | tee -a "$logfile"
+      ;;
+    10)
+      echo "$timestamp Fehler: Home-Verzeichnisse konnten nicht erstellt werden." | tee -a "$logfile"
+      ;;
+    11)
+      echo "$timestamp Fehler: Git-Verzeichnisse konnten nicht erstellt werden." | tee -a "$logfile"
+      ;;
+    12)
+      echo "$timestamp Fehler: Config-Verzeichnisse konnten nicht erstellt werden." | tee -a "$logfile"
+      ;;
+    13)
+      echo "$timestamp Fehler: Git Repositories konnten nicht geklont werden." | tee -a "$logfile"
+      ;;
+    14 | 15 | 16 | 17 | 18 | 19)
+      echo "$timestamp Fehler: Config-Dateien konnten nicht kopiert werden." | tee -a "$logfile"
+      ;;
+    20)
+      echo "$timestamp Fehler: Fuzzyfind Bash-Funktion konnte nicht eingerichtet werden." | tee -a "$logfile"
+      ;;
+    21)
+      echo "$timestamp Fehler: HiDrive SSH-Key konnte nicht erstellt oder kopiert werden." | tee -a "$logfile"
+      ;;
+    22)
+      echo "$timestamp Fehler: Darkmode konnte nicht aktiviert werden." | tee -a "$logfile"
+      ;;
+    23)
+      echo "$timestamp Fehler: Bluetooth konnte nicht gestartet oder aktiviert werden." | tee -a "$logfile"
+      ;;
+    124)
+      echo "$timestamp Fehler: Watchdog Timeout erreicht, Skript abgebrochen." | tee -a "$logfile"
+      ;;
+    24)
+      echo "$timestamp Fehler: beim installieren von zenity." | tee -a "$logfile"
+      ;;
+    25)
+      echo "$timestamp Fehler: beim erstellen von asksw.sh." | tee -a "$logfile"
+      ;;
+    *)
+      echo "$timestamp Unbekannter Fehler (Exit-Code: $error)" | tee -a "$logfile"
+      ;;
+  esac
+}
+
+# root
+# checking if it was started with sudo
+rootcheck() {
+  get_timestamp
+  if ! command -v sudo -A >/dev/null; then
+    echo "$timestamp sudo is not installed" | tee -a "$logfile"
+    exit 2
   fi
-  if [ -f "$HOME/.config/nvim/lua/config/$file" ]; then
-    sudo mv "$HOME/.config/nvim/lua/config/$file" "$HOME/.config/nvim/lua/config/$file.bak" >>"$log_file" 2>>"$error_log_file"
-    echo "Backup von $file erstellt" >>"$log_file"
+
+  get_timestamp
+  if [[ $UID -ne 0 ]]; then
+    exit 2
   fi
-  sudo cp "/home/$user_name/git1/config/$file" "$HOME/.config/nvim/lua/config/$file" >>"$log_file" 2>>"$error_log_file"
-  check_error "Kopieren von $file"
-done
-if [ ! -f "/home/$user_name/git1/config/init.lua" ]; then
-  echo "Fehler: init.lua existiert nicht in /home/$user_name/git1/config/" >>"$log_file" 2>>"$error_log_file"
-  check_error "Quelldatei init.lua fehlt"
-fi
-if [ -f "$HOME/.config/nvim/init.lua" ]; then
-  sudo mv "$HOME/.config/nvim/init.lua" "$HOME/.config/nvim/init.lua.bak" >>"$log_file" 2>>"$error_log_file"
-  echo "Backup von init.lua erstellt" >>"$log_file"
-fi
-sudo cp "/home/$user_name/git1/config/init.lua" "$HOME/.config/nvim/init.lua" >>"$log_file" 2>>"$error_log_file"
-check_error "Kopieren von init.lua"
+}
 
-# Hyprland-Dateien
-for file in "${hypr_files[@]}"; do
-  if [ ! -f "/home/$user_name/git1/config/$file" ]; then
-    echo "Fehler: $file existiert nicht in /home/$user_name/git1/config/" >>"$log_file" 2>>"$error_log_file"
-    check_error "Quelldatei $file fehlt"
+uppacman() {
+  rootcheck
+  get_timestamp
+  if [[ -f /var/lib/pacman/db.lck ]]; then
+    echo "$timestamp pacman db is locked, trying to fix it" | tee -a "$logfile"
+    rm -rf /var/lib/pacman/db.lck
   fi
-  if [ -f "$HOME/.config/hypr/$file" ]; then
-    sudo mv "$HOME/.config/hypr/$file" "$HOME/.config/hypr/$file.bak" >>"$log_file" 2>>"$error_log_file"
-    echo "Backup von $file erstellt" >>"$log_file"
-  else
-    mkdir -p "$HOME/.config/hypr/"
-    echo "hypr Ordner wurde erstellt"
+  echo "$timestamp pacman keyring update" | tee -a "$logfile"
+  watchdog pacman -Syu archlinux-keyring --noconfirm || exit 3
+
+  get_timestamp
+  echo "$timestamp pacman update" | tee -a "$logfile"
+  watchdog pacman -Syu --noconfirm || exit 4
+}
+
+upyay() {
+  rootcheck
+  get_timestamp
+  echo "$timestamp yay update" | tee -a "$logfile"
+  sudo -A -u "$username" yay -Syu --noconfirm || exit 5
+}
+
+upnpm() {
+  rootcheck
+  get_timestamp
+  echo "$timestamp npm update" | tee -a "$logfile"
+  npm update -g || exit 6
+}
+
+installpacman() {
+  rootcheck
+  if [[ -f /var/lib/pacman/db.lck ]]; then
+    echo "$timestamp pacman db is locked, trying to fix it" | tee -a "$logfile"
+    rm -rf /var/lib/pacman/db.lck
   fi
-  sudo cp "/home/$user_name/git1/config/$file" "$HOME/.config/hypr/$file" >>"$log_file" 2>>"$error_log_file"
-  check_error "Kopieren von $file"
-done
+  for prog in "${progpac[@]}"; do
+    get_timestamp
+    echo "$timestamp $prog will be installed" | tee -a "$logfile"
+    watchdog pacman -S "$prog" --needed --noconfirm || exit 4
+  done
 
-# Waybar-Dateien
-for file in "${waybar_files[@]}"; do
-  if [ ! -f "/home/$user_name/git1/config/$file" ]; then
-    echo "Fehler: $file existiert nicht in /home/$user_name/git1/config/" >>"$log_file" 2>>"$error_log_file"
-    check_error "Quelldatei $file fehlt"
+  for prog in "${progpacnowatchdog[@]}"; do
+    get_timestamp
+    echo "$timestamp $prog will be installed without watchdog" | tee -a "$logfile"
+    pacman -S "$prog" --needed --noconfirm || exit 4
+  done
+}
+
+installyay() {
+  get_timestamp
+  echo "$timestamp yay will be installed" | tee -a "$logfile"
+  echo "$timestamp pacman --needed git and base-devel are installed" | tee -a "$logfile"
+  sudo -A pacman -S --needed --noconfirm git base-devel
+  echo "$timestamp changing into $user" | tee -a "$logfile"
+  cd "$user" || exit 7
+  echo "$timestamp if yay does not exists, git clone" | tee -a "$logfile"
+  if [[ ! -d "yay" ]]; then
+    sudo -A -u "$username" git clone https://aur.archlinux.org/yay.git
   fi
-  if [ -f "$HOME/.config/waybar/$file" ]; then
-    sudo mv "$HOME/.config/waybar/$file" "$HOME/.config/waybar/$file.bak" >>"$log_file" 2>>"$error_log_file"
-    echo "Backup von $file erstellt" >>"$log_file"
-  else
-    mkdir -p "$HOME/.config/waybar"
-    echo "waybar Ordner wurde erstllt"
+  get_timestamp
+  echo "$timestamp changing into yay" | tee -a "$logfile"
+  cd yay || exit 7
+  sudo -A -u "$username" makepkg -si --noconfirm --needed || exit 7
+  get_timestamp
+  echo "$timestamp changing back to $user" | tee -a "$logfile"
+  cd "$user" || exit 7
+
+  get_timestamp
+  echo "$timestamp yay pac will be installed" | tee -a "$logfile"
+
+  for prog in "${progyay[@]}"; do
+    get_timestamp
+    echo "$timestamp $prog will be installed" | tee -a "$logfile"
+    yay -S "$prog" --needed --noconfirm || exit 7
+  done
+
+  get_timestamp
+  echo "$timestamp yay without root  will be installed" | tee -a "$logfile"
+
+  for prog in "${progyaynosudo[@]}"; do
+    get_timestamp
+    echo "$timestamp $prog will be installed" | tee -a "$logfile"
+    sudo -A -u "$username" yay -S "$prog" --needed --noconfirm || exit 7
+  done
+}
+
+installnpm() {
+  get_timestamp
+  echo "$timestamp npm pac will be installed" | tee -a "$logfile"
+  echo "$timestamp tree-sitter will be installed" | tee -a "$logfile"
+  #npm install -g tree-sitter --silent --verbose || exit 8
+
+  get_timestamp
+  echo "$timestamp tree-sitter-cli will be installed" | tee -a "$logfile"
+  npm install -g tree-sitter-cli --silent --verbose || exit 8
+
+  get_timestamp
+  echo "$timestamp prettier will be installed" | tee -a "$logfile"
+  npm install -g prettier --silent --verbose || exit 8
+}
+
+watchdog() {
+  local cmd=("$@")
+
+  (sleep ${warntime%s} && get_timestamp && echo "$timestamp Warning, 10s left before the script will be stopped" | tee -a "$logfile") &
+  local warn_pid=$!
+
+  if ! timeout "$deathtime" "${cmd[@]}"; then
+    get_timestamp
+    echo "$timestamp Watchdog was reached, script will be stopped" | tee -a "$logfile"
+    exit 124
   fi
-  sudo cp "/home/$user_name/git1/config/$file" "$HOME/.config/waybar/$file" >>"$log_file" 2>>"$error_log_file"
-  check_error "Kopieren von $file"
-done
 
-# Qutebrowser
-if [ ! -f "/home/$user_name/git1/config/config.py" ]; then
-  echo "Fehler: config.py existiert nicht in /home/$user_name/git1/config/" >>"$log_file" 2>>"$error_log_file"
-  check_error "Quelldatei config.py fehlt"
-fi
-if [ -f "$HOME/.config/qutebrowser/config.py" ]; then
-  sudo mv "$HOME/.config/qutebrowser/config.py" "$HOME/.config/qutebrowser/config.py.bak" >>"$log_file" 2>>"$error_log_file"
-  echo "Backup von config.py erstellt" >>"$log_file"
-else
-  mkdir -p "$HOME/.config/qutebrowser/"
-  echo "qutebrowser Ordner wurde erstllt"
-fi
-sudo cp "/home/$user_name/git1/config/config.py" "$HOME/.config/qutebrowser/config.py" >>"$log_file" 2>>"$error_log_file"
-check_error "Kopieren von config.py"
+  kill "$warn_pid" 2>/dev/null
+}
+makedir() {
+  get_timestamp
+  echo "$timestamp creating directories for prog" | tee -a "$logfile"
+  for prog in "${proglang[@]}"; do
+    get_timestamp
+    echo "$timestamp creating directories $prog" | tee -a "$logfile"
+    sudo -A -u "$username" mkdir -p "$user/Prog/$prog" "$user/Doku/$prog" "$user/Git/$prog" || exit 9
+  done
 
-# Kitty-Konfiguration
-echo -e "\n ------Kitty-Konfiguration------"
-notify-send "Kitty wird konfiguriert"
-if [ ! -f "/home/$user_name/git1/config/kitty.conf" ]; then
-  echo "Fehler: kitty.conf existiert nicht in /home/$user_name/git1/config/" >>"$log_file" 2>>"$error_log_file"
-  check_error "Quelldatei kitty.conf fehlt"
-fi
-if [ -f "$HOME/.config/kitty/kitty.conf" ]; then
-  sudo mv "$HOME/.config/kitty/kitty.conf" "$HOME/.config/kitty/kitty.conf.bak" >>"$log_file" 2>>"$error_log_file"
-  echo "Backup von kitty.conf erstellt" >>"$log_file"
-else
-  mkdir -p "$HOME/.config/kitty/"
-  echo "kitty Ordner wurde erstellt"
-fi
-sudo cp "/home/$user_name/git1/config/kitty.conf" "$HOME/.config/kitty/kitty.conf" >>"$log_file" 2>>"$error_log_file"
-check_error "Kopieren von kitty.conf"
+  get_timestamp
+  echo "$timestamp creating directories in HOME" | tee -a "$logfile"
+  for dirs in "${homedirs[@]}"; do
+    get_timestamp
+    echo "$timestamp creating directories $dirs" | tee -a "$logfile"
+    sudo -A -u "$username" mkdir -p "$user/$dirs" || exit 10
+  done
 
-# Dateien aus tobil939/scripts kopieren
-echo -e "\n ------Daten kopieren (scripts)------"
-notify-send "Skripte werden kopiert"
-cp -r /home/$user_name/git1/scripts/* $HOME/Scripts/
-cd /home/$user_name/git1/scripts
-check_error "Wechseln in scripts-Verzeichnis"
-script_files=("bluetooth.sh" "bunga.sh" "flash.sh" "mnt.sh" "pico.sh" "tex.sh" "update.sh")
-for file in "${script_files[@]}"; do
-  if [ ! -f "/home/$user_name/git1/scripts/$file" ]; then
-    echo "Fehler: $file existiert nicht in /home/$user_name/git1/scripts/" >>"$log_file" 2>>"$error_log_file"
-    check_error "Quelldatei $file fehlt"
+  get_timestamp
+  echo "$timestamp creating directories for git repos" | tee -a "$logfile"
+  for dirs in "${git_repo[@]}"; do
+    get_timestamp
+    echo "$timestamp creating directories $dirs" | tee -a "$logfile"
+    sudo -A -u "$username" mkdir -p "$user/git1/$dirs" || exit 11
+  done
+
+  get_timestamp
+  echo "$timestamp creating directories for .config files" | tee -a "$logfile"
+  for dirs in "${confdirs[@]}"; do
+    get_timestamp
+    echo "$timestamp creating directories $dirs" | tee -a "$logfile"
+    sudo -A -u "$username" mkdir -p "$dirs" || exit 12
+  done
+}
+
+clonegit() {
+  get_timestamp
+  echo "$timestamp git repos will be cloned" | tee -a "$logfile"
+  echo "$user"
+  for repo in "${git_repo[@]}"; do
+    repo_url="https://github.com/tobil939/$repo.git"
+    target_dir="$user/git1/$repo"
+
+    if [[ -d "$target_dir/.git" ]]; then
+      echo "$timestamp $repo already cloned" | tee -a "$logfile"
+    else
+      sudo -A -u "$username" git clone --depth=1 "$repo_url" "$target_dir" || exit 13
+    fi
+  done
+}
+
+copieconf() {
+  local fromdir
+  local todir
+  fromdir="$user/git1/neovim"
+  todir="$user/.config/nvim"
+  get_timestamp
+  echo "$timestamp init.lua wll be copied" | tee -a "$logfile"
+  cp "$fromdir/init.lua" "$todir/init.lua"
+  if [[ ! -f "$todir/init.lua" ]]; then
+    echo "$timestamp init.lua was not copied"
   fi
-  if [ -f "/usr/local/bin/$file" ]; then
-    sudo mv "/usr/local/bin/$file" "/usr/local/bin/$file.bak" >>"$log_file" 2>>"$error_log_file"
-    echo "Backup von $file erstellt" >>"$log_file"
-  fi
-  sudo cp "/home/$user_name/git1/scripts/$file" "/usr/local/bin/$file" >>"$log_file" 2>>"$error_log_file"
-  sudo chmod +x "/usr/local/bin/$file" >>"$log_file" 2>>"$error_log_file"
-  check_error "Kopieren und Ausführbar-Machen von $file"
-done
 
-# Dark Mode
-echo -e "\n ------Dark Mode------"
-notify-send "Dark Mode wird aktiviert"
-if command -v gsettings >/dev/null; then
-  gsettings set org.gnome.desktop.interface gtk-theme "Arc-Dark" >>"$log_file" 2>>"$error_log_file"
-  gsettings set org.gnome.desktop.interface icon-theme "Adwaita" >>"$log_file" 2>>"$error_log_file"
-  gsettings set org.gnome.shell.extensions.user-theme name "Adwaita" >>"$log_file" 2>>"$error_log_file"
-  gsettings set org.gnome.desktop.interface color-scheme prefer-dark >>"$log_file" 2>>"$error_log_file"
-  check_error "Aktivierung von Dark Mode"
-else
-  echo "GNOME nicht gefunden, Dark Mode wird übersprungen" >>"$log_file"
-fi
+  get_timestamp
+  echo "$timestamp config files will be copied" | tee -a "$logfile"
+  [[ -d "${confdirs[0]}" ]] || exit 14
+  for files in "${nvim_config_files[@]}"; do
+    get_timestamp
+    echo "$timestamp $files will be copied" | tee -a "$logfile"
+    cp "$user/git1/neovim/$files" "${confdirs[0]}/$files" || exit 14
+  done
 
-# Bluetooth
-echo -e "\n ------Bluetooth------"
-notify-send "Bluetooth wird aktiviert"
-sudo systemctl start bluetooth.service >>"$log_file" 2>>"$error_log_file"
-sudo systemctl enable bluetooth.service >>"$log_file" 2>>"$error_log_file"
-check_error "Aktivierung von Bluetooth"
+  [[ -d "${confdirs[1]}" ]] || exit 15
+  for files in "${nvim_plugin_files[@]}"; do
+    get_timestamp
+    echo "$timestamp $files will be copied" | tee -a "$logfile"
+    cp "$user/git1/neovim/$files" "${confdirs[1]}/$files" || exit 15
+  done
 
-if [ ! -w ~/.bashrc ]; then
-  echo "Fehler: ~/.bashrc ist nicht beschreibbar" >>"$error_log_file"
-  exit 1
-fi
+  [[ -d "${confdirs[2]}" ]] || exit 16
+  for files in "${hypr_files[@]}"; do
+    get_timestamp
+    echo "$timestamp $files will be copied" | tee -a "$logfile"
+    cp "$user/git1/config/$files" "${confdirs[2]}/$files" || exit 16
+  done
 
-# Neofetch in .bashrc
-echo -e "\n ------Neofetch einbinden------"
-if ! grep -Fxq "neofetch" ~/.bashrc; then
-  echo "neofetch" >>~/.bashrc 2>>"$error_log_file"
-  echo "neofetch hinzugefügt" >>"$log_file"
-else
-  echo "neofetch bereits vorhanden" >>"$log_file"
-fi
+  [[ -d "${confdirs[3]}" ]] || exit 17
+  for files in "${waybar_files[@]}"; do
+    get_timestamp
+    echo "$timestamp $files will be copied" | tee -a "$logfile"
+    cp "$user/git1/config/$files" "${confdirs[3]}/$files" || exit 17
+  done
 
-# Timestamp comand adding to .bashrc
-echo "stemp() {
-  echo "$(date '+%Y-%m-%d %H:%M:%S')"
-}" >>~/.bashrc
+  [[ -d "${confdirs[4]}" ]] || exit 18
+  for files in "${kitty_files[@]}"; do
+    get_timestamp
+    echo "$timestamp $files will be copied" | tee -a "$logfile"
+    cp "$user/git1/config/$files" "${confdirs[4]}/$files" || exit 18
+  done
 
-# Hidrive comand adding, maybe problmes with the key, to .bashrc
-echo "{
-  sshfs harddisk-5820@sftp.hidrive.strato.com:/users/harddisk-5820 ~/hidrive -o IdentityFile=~/.ssh/hidrive_key
-}" >>~/.bashrc
+  [[ -d "${confdirs[5]}" ]] || exit 19
+  for files in "${qute_files[@]}"; do
+    get_timestamp
+    echo "$timestamp $files will be copied" | tee -a "$logfile"
+    cp "$user/git1/config/$files" "${confdirs[5]}/$files" || exit 19
+  done
+}
 
-# Fuzzyfining comand adding, fzf with cat preview and opening in nvim
-echo "fuzzy() {
+conffuzzy() {
+  get_timestamp
+  echo "$timestamp config fuzzyfind" | tee -a "$logfile"
+  if ! grep -q fuzzy ~/.bashrc; then
+    cat >>"$user/.bashrc" <<'EOF'
+export GREP_COLORS='mt=1;35'
+export LS_COLORS="di=1;35:fi=0:ln=36"
+
+alias grep='grep --color=auto'
+alias ls='ls --color=auto'
+alias sl='ls -lh --color=auto'
+
+fuzzy() {
   local file
   file=$(find . -type f | fzf --preview 'cat {}' --height 80% --border)
   [[ -n "$file" ]] && nvim "$file"
-}" >>~/.bashrc
+}
+EOF
+  fi
+}
 
-# Git-Konfiguration
-echo -e "\n ------Git config------"
-read -p "Benutzername für git: " user_git
-echo -e "\n Benutzername für git: $user_git \n" >>"$log_file"
-read -p "Emailadresse für git: " user_email
-echo -e "\n Emailadresse für git: $user_email \n" >>"$log_file"
-git config --global user.name "$user_git" >>"$log_file" 2>>"$error_log_file"
-git config --global user.email "$user_email" >>"$log_file" 2>>"$error_log_file"
-git config --global core.editor nvim >>"$log_file" 2>>"$error_log_file"
-check_error "Git-Konfiguration"
+get_dbus_address() {
+  get_timestamp
 
-# Abschluss
-echo -e "\n ------Fertig------"
-notify-send "Installation abgeschlossen"
-#reboot
+  pid=$(pgrep -u "$username" gnome-session | head -n 1)
+  if [[ -z "$pid" ]]; then
+    echo "$timestamp Fehler: Keine gnome-session für $username gefunden." | tee -a "$logfile"
+    return 1
+  fi
+
+  DBUS_SESSION_BUS_ADDRESS=$(grep -z DBUS_SESSION_BUS_ADDRESS /proc/"$pid"/environ | sed -e 's/DBUS_SESSION_BUS_ADDRESS=//')
+  if [[ -z "$DBUS_SESSION_BUS_ADDRESS" ]]; then
+    echo "$timestamp Fehler: Konnte DBUS_SESSION_BUS_ADDRESS nicht auslesen." | tee -a "$logfile"
+    return 1
+  fi
+
+  export DBUS_SESSION_BUS_ADDRESS
+}
+
+confdarkmode() {
+  get_timestamp
+  echo "$timestamp Setting up dark mode..." | tee -a "$logfile"
+
+  if command -v gsettings >/dev/null; then
+    get_dbus_address
+
+    themes=(
+      'org.gnome.desktop.interface gtk-theme "Arc-Dark"'
+      'org.gnome.desktop.interface icon-theme "Adwaita"'
+      'org.gnome.shell.extensions.user-theme "Adwaita"'
+      'org.gnome.desktop.interface color-scheme "prefer-dark"'
+    )
+
+    for setting in "${themes[@]}"; do
+      sudo -A -u "$username" DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" gsettings set "$setting"
+    done
+
+    echo "$timestamp Dark Mode aktiviert" | tee -a "$logfile"
+  else
+    echo "$timestamp GNOME nicht gefunden, Dark Mode wird übersprungen" | tee -a "$logfile"
+  fi
+}
+
+confblue() {
+  rootcheck
+  get_timestamp
+  echo "$timestamp setting up bluetooth" | tee -a "$logfile"
+  systemctl start bluetooth.service || exit 23
+  systemctl enable bluetooth.service || exit 23
+}
+
+pwscript() {
+  local path
+  local filename
+  local error
+  path=$(pwd)
+  filename="asksw.sh"
+
+  sudo pacman -S zenity --noconfirm
+  which zenity
+  error=$?
+
+  [[ "$error" -ge 1 ]] && exit 24
+
+  cd "$path" || exit
+
+  touch "$filename"
+  [[ -f "$filename" ]] || exit 25
+
+  cat <<'EOF' >"$filename"
+#!/usr/bin/env bash
+zenity --password --title="Sudo Password"
+EOF
+
+  chmod +x "$filename"
+
+  export SUDO_ASKPASS="$path/$filename"
+}
+
+# Main
+trap 'handling $?' EXIT
+get_timestamp
+logging
+rootcheck
+pwscript
+uppacman
+installpacman
+uppacman
+installyay
+upyay
+installnpm
+upnpm
+makedir
+clonegit
+copieconf
+conffuzzy
+confdarkmode
+confblue
