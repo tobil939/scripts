@@ -196,97 +196,81 @@ handling() {
   local error="$1"
   get_timestamp
   case $error in
-    0)
-      echo "$timestamp Alles lief erfolgreich, keine Fehler." | tee -a "$logfile"
-      echo "$timestamp Logfile wird nach /tmp verschoben." | tee -a "$logfile"
-      mv -v "$logfile" "/tmp/$logfilename"
-      ;;
-    1)
-      echo "$timestamp Fehler: Logfile konnte nicht erstellt oder beschrieben werden." | tee -a "$logfile"
-      ;;
-    2)
-      echo "$timestamp Fehler: Skript muss als root oder mit sudo ausgeführt werden." | tee -a "$logfile"
-      ;;
-    3)
-      echo "$timestamp Fehler: Arch Keyring Update fehlgeschlagen." | tee -a "$logfile"
-      ;;
-    4)
-      echo "$timestamp Fehler: Pacman Update oder Paketinstallation fehlgeschlagen." | tee -a "$logfile"
-      ;;
-    5)
-      echo "$timestamp Fehler: Yay Update oder Installation fehlgeschlagen." | tee -a "$logfile"
-      ;;
-    6)
-      echo "$timestamp Fehler: NPM Update oder Installation globaler Pakete fehlgeschlagen." | tee -a "$logfile"
-      ;;
-    7)
-      echo "$timestamp Fehler: AUR Paketinstallation über Yay fehlgeschlagen." | tee -a "$logfile"
-      ;;
-    8)
-      echo "$timestamp Fehler: NPM globale Packages Installation fehlgeschlagen." | tee -a "$logfile"
-      ;;
-    9)
-      echo "$timestamp Fehler: Verzeichnisse für Programm-Ordner konnten nicht erstellt werden." | tee -a "$logfile"
-      ;;
-    10)
-      echo "$timestamp Fehler: Home-Verzeichnisse konnten nicht erstellt werden." | tee -a "$logfile"
-      ;;
-    11)
-      echo "$timestamp Fehler: Git-Verzeichnisse konnten nicht erstellt werden." | tee -a "$logfile"
-      ;;
-    12)
-      echo "$timestamp Fehler: Config-Verzeichnisse konnten nicht erstellt werden." | tee -a "$logfile"
-      ;;
-    13)
-      echo "$timestamp Fehler: Git Repositories konnten nicht geklont werden." | tee -a "$logfile"
-      ;;
-    14 | 15 | 16 | 17 | 18 | 19)
-      echo "$timestamp Fehler: Config-Dateien konnten nicht kopiert werden." | tee -a "$logfile"
-      ;;
-    20)
-      echo "$timestamp Fehler: Fuzzyfind Bash-Funktion konnte nicht eingerichtet werden." | tee -a "$logfile"
-      ;;
-    21)
-      echo "$timestamp Fehler: HiDrive SSH-Key konnte nicht erstellt oder kopiert werden." | tee -a "$logfile"
-      ;;
-    22)
-      echo "$timestamp Fehler: Darkmode konnte nicht aktiviert werden." | tee -a "$logfile"
-      ;;
-    23)
-      echo "$timestamp Fehler: Bluetooth konnte nicht gestartet oder aktiviert werden." | tee -a "$logfile"
-      ;;
-    124)
-      echo "$timestamp Fehler: Watchdog Timeout erreicht, Skript abgebrochen." | tee -a "$logfile"
-      ;;
-    24)
-      echo "$timestamp Fehler: beim installieren von zenity." | tee -a "$logfile"
-      ;;
-    25)
-      echo "$timestamp Fehler: beim erstellen von asksw.sh." | tee -a "$logfile"
-      ;;
-    *)
-      echo "$timestamp Unbekannter Fehler (Exit-Code: $error)" | tee -a "$logfile"
-      ;;
+  0)
+    echo "$timestamp Alles lief erfolgreich, keine Fehler." | tee -a "$logfile"
+    echo "$timestamp Logfile wird nach /tmp verschoben." | tee -a "$logfile"
+    mv -v "$logfile" "/tmp/$logfilename"
+    ;;
+  1)
+    echo "$timestamp Fehler: Logfile konnte nicht erstellt oder beschrieben werden." | tee -a "$logfile"
+    ;;
+  2)
+    echo "$timestamp Fehler: Skript muss als root oder mit sudo ausgeführt werden." | tee -a "$logfile"
+    ;;
+  3)
+    echo "$timestamp Fehler: Arch Keyring Update fehlgeschlagen." | tee -a "$logfile"
+    ;;
+  4)
+    echo "$timestamp Fehler: Pacman Update oder Paketinstallation fehlgeschlagen." | tee -a "$logfile"
+    ;;
+  5)
+    echo "$timestamp Fehler: Yay Update oder Installation fehlgeschlagen." | tee -a "$logfile"
+    ;;
+  6)
+    echo "$timestamp Fehler: NPM Update oder Installation globaler Pakete fehlgeschlagen." | tee -a "$logfile"
+    ;;
+  7)
+    echo "$timestamp Fehler: AUR Paketinstallation über Yay fehlgeschlagen." | tee -a "$logfile"
+    ;;
+  8)
+    echo "$timestamp Fehler: NPM globale Packages Installation fehlgeschlagen." | tee -a "$logfile"
+    ;;
+  9)
+    echo "$timestamp Fehler: Verzeichnisse für Programm-Ordner konnten nicht erstellt werden." | tee -a "$logfile"
+    ;;
+  10)
+    echo "$timestamp Fehler: Home-Verzeichnisse konnten nicht erstellt werden." | tee -a "$logfile"
+    ;;
+  11)
+    echo "$timestamp Fehler: Git-Verzeichnisse konnten nicht erstellt werden." | tee -a "$logfile"
+    ;;
+  12)
+    echo "$timestamp Fehler: Config-Verzeichnisse konnten nicht erstellt werden." | tee -a "$logfile"
+    ;;
+  13)
+    echo "$timestamp Fehler: Git Repositories konnten nicht geklont werden." | tee -a "$logfile"
+    ;;
+  14 | 15 | 16 | 17 | 18 | 19)
+    echo "$timestamp Fehler: Config-Dateien konnten nicht kopiert werden." | tee -a "$logfile"
+    ;;
+  20)
+    echo "$timestamp Fehler: Fuzzyfind Bash-Funktion konnte nicht eingerichtet werden." | tee -a "$logfile"
+    ;;
+  21)
+    echo "$timestamp Fehler: HiDrive SSH-Key konnte nicht erstellt oder kopiert werden." | tee -a "$logfile"
+    ;;
+  22)
+    echo "$timestamp Fehler: Darkmode konnte nicht aktiviert werden." | tee -a "$logfile"
+    ;;
+  23)
+    echo "$timestamp Fehler: Bluetooth konnte nicht gestartet oder aktiviert werden." | tee -a "$logfile"
+    ;;
+  124)
+    echo "$timestamp Fehler: Watchdog Timeout erreicht, Skript abgebrochen." | tee -a "$logfile"
+    ;;
+  24)
+    echo "$timestamp Fehler: beim installieren von zenity." | tee -a "$logfile"
+    ;;
+  25)
+    echo "$timestamp Fehler: beim erstellen von asksw.sh." | tee -a "$logfile"
+    ;;
+  *)
+    echo "$timestamp Unbekannter Fehler (Exit-Code: $error)" | tee -a "$logfile"
+    ;;
   esac
 }
 
-# root
-# checking if it was started with sudo
-rootcheck() {
-  get_timestamp
-  if ! command -v sudo -A >/dev/null; then
-    echo "$timestamp sudo is not installed" | tee -a "$logfile"
-    exit 2
-  fi
-
-  get_timestamp
-  if [[ $UID -ne 0 ]]; then
-    exit 2
-  fi
-}
-
 uppacman() {
-  rootcheck
   get_timestamp
   if [[ -f /var/lib/pacman/db.lck ]]; then
     echo "$timestamp pacman db is locked, trying to fix it" | tee -a "$logfile"
@@ -301,21 +285,18 @@ uppacman() {
 }
 
 upyay() {
-  rootcheck
   get_timestamp
   echo "$timestamp yay update" | tee -a "$logfile"
   sudo -A -u "$username" yay -Syu --noconfirm || exit 5
 }
 
 upnpm() {
-  rootcheck
   get_timestamp
   echo "$timestamp npm update" | tee -a "$logfile"
   npm update -g || exit 6
 }
 
 installpacman() {
-  rootcheck
   if [[ -f /var/lib/pacman/db.lck ]]; then
     echo "$timestamp pacman db is locked, trying to fix it" | tee -a "$logfile"
     rm -rf /var/lib/pacman/db.lck
@@ -571,7 +552,6 @@ confdarkmode() {
 }
 
 confblue() {
-  rootcheck
   get_timestamp
   echo "$timestamp setting up bluetooth" | tee -a "$logfile"
   systemctl start bluetooth.service || exit 23
@@ -610,7 +590,6 @@ EOF
 trap 'handling $?' EXIT
 get_timestamp
 logging
-rootcheck
 pwscript
 uppacman
 installpacman
