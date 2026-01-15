@@ -89,12 +89,12 @@ progyay=(
   "python3"
   "python-debugpy"
   "python-pip"
-  "python-gdbgui"
   #"haskell-hlint"
   "go-tools"
   "zig"
   "zls"
-  "codelldb"
+  "copyq"
+  "ddcutil"
 )
 
 progyaynosudo=(
@@ -102,6 +102,8 @@ progyaynosudo=(
   "texlive"
   "neofetch"
   "arc-gtk-theme"
+  "python-gdbgui"
+  "codelldb"
   "gtk2"
   "gtk-engine-murrine"
   "nitrogen"
@@ -540,9 +542,18 @@ confbashrc() {
 # If not running interactively, don't do anything
 [[ $- != *i* ]] && return
 
+alias ls='ls --color=auto'
+alias grep='grep --color=auto'
 PS1='[\u@\h \W]\$ '
-export GREP_COLORS='mt=1;35'
-export LS_COLORS="di=1;35:fi=0:ln=36"
+# ~/.bashrc
+#
+
+# If not running interactively, don't do anything
+[[ $- != *i* ]] && return
+
+PS1='[\u@\h \W]\$ '
+#export GREP_COLORS='mt=1;35'
+#export LS_COLORS="di=1;35:fi=0:ln=36"
 
 alias grep='grep --color=auto'
 alias ls='ls --color=auto'
@@ -560,11 +571,10 @@ greppy() {
 }
 
 trs() {
-  local file
-  local filename
-  file="$1"
-  filename=$(basename "$file")
-  mv "$file" /tmp/"$filename"
+  for file in "$@"; do
+    filename=$(basename "$file")
+    mv "$file" /tmp/"$filename"
+  done
 }
 
 bashing() {
@@ -577,7 +587,7 @@ bashing() {
   oldpath=$(pwd)
 
   data="$1"
-  [[ -z "$data" ]] || exit 91
+  [[ -z "$data" ]] && exit 91
 
   handling() {
     local error="$1"
@@ -610,12 +620,20 @@ bashing() {
     ls -lh
   fi
 
-  cat <<'EOF' >"$file"
-#!/usr/bin/env bash
+  cat <<EOF >"$file"
+#!/usr/bin/env bash 
+# Script: $file
+# Author: $(whoami)
+# Date: $(date +"%Y-%m-%d_%H:%M:%S") 
+# License: MIT
+# Description: ....
 
+EOF
+
+  cat <<'EOF' >>"$file"
 # Logfile 
 logfile="$HOME/logging/logfile.log"
-logpath="(dirname "$logfile")"
+logpath="$HOME/logging/"
 
 # Zeitstempel holen
 get_timestamp() {
@@ -660,6 +678,7 @@ EOF
 
   cd "$oldpath" || exit 88
 }
+export PATH="/home/tobil/.pixi/bin:$PATH"
 HERE
 }
 
