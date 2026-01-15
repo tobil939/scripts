@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# Script: copy
+# Author: tobil
+# Date: 2026-01-15_21:31:43
+# License: MIT
+# Description: ....
+
+# Logfile
+logfile="$HOME/logging/logfile.log"
+logpath="$HOME/logging/"
+copyto="/usr/local/bin/"
+
+copyshit=(
+  "mnt.sh"
+  "pico.sh"
+  "bluetooth.sh"
+  "tex.sh"
+  "update.sh"
+)
+
+# Zeitstempel holen
+get_timestamp() {
+  timestamp=$(date +"%Y-%m-%d_%H:%M:%S")
+}
+
+# Logging initialisieren
+logging() {
+  get_timestamp
+  echo "$timestamp Log path: $logpath" | tee -a "$logfile"
+  echo "$timestamp Log file: $logfile" | tee -a "$logfile"
+
+  # Logfile pruefen/erstellen
+  if [[ -f "$logfile" ]]; then
+    get_timestamp
+    echo "$timestamp Logfile exists" | tee -a "$logfile"
+  else
+    get_timestamp
+    echo "$timestamp Creating logfile" | tee -a "$logfile"
+    mkdir -p "$logpath" || {
+      echo "$timestamp Failed to create logpath" | tee -a "$logfile"
+      exit 1
+    }
+    touch "$logfile" || {
+      echo "$timestamp Failed to create logfile" | tee -a "$logfile"
+      exit 2
+    }
+    echo "$timestamp Logfile created" | tee -a "$logfile"
+  fi
+}
+
+# Fehlerbehandlung
+handling() {
+  local error="$1"
+  get_timestamp
+  case $error in
+    0) echo "$timestamp Script completed successfully" | tee -a "$logfile" ;;
+    1)
+      echo "$timestamp Directory error" | tee -a "$logfile"
+      exit 1
+      ;;
+    2)
+      echo "$timestamp Logfile error" | tee -a "$logfile"
+      exit 2
+      ;;
+    4)
+      echo "$timestamp nvim not installed" | tee -a "$logfile"
+      exit 4
+      ;;
+    *)
+      echo "$timestamp Unknown error: $error" | tee -a "$logfile"
+      exit "$error"
+      ;;
+  esac
+}
+
+copydings() {
+  for shit in "${copyshit[@]}"; do
+    cp "$shit" "$copyto/${shit%.sh}"
+    echo "copie $shit to $copyto"
+  done
+}
+
+trap 'handling $?' EXIT
+
+logging
+echo "starting wit the copie shit stuff"
+ls -lh
+copydings
+echo "finish shit"

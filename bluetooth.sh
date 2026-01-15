@@ -33,16 +33,16 @@ handling() {
   error="$?"
   get_timestamp
   case $error in
-  0) (
-    echo "$timestamp everything went as planned, no errors" | tee -a "$logfile"
-    echo "$timestamp logfile will be moved into /tmp" | tee -a "$logfile"
-    mv -v "$logfile" "/tmp/bluetooth.log"
-  ) ;;
-  1) echo "$timestamp failed to create or access logfile" | tee -a "$logfile" ;;
-  2) echo "$timestamp must be run as root or with sudo!" | tee -a "$logfile" ;;
-  3) echo "$timestamp can't start the bluetooth service" | tee -a "$logfile" ;;
-  4) echo "$timestamp can't enable the bluetooth service" | tee -a "$logfile" ;;
-  *) echo "$timestamp unknown error" | tee -a "$logfile" ;;
+    0) (
+      echo "$timestamp everything went as planned, no errors" | tee -a "$logfile"
+      echo "$timestamp logfile will be moved into /tmp" | tee -a "$logfile"
+      mv -v "$logfile" "/tmp/bluetooth.log"
+    ) ;;
+    1) echo "$timestamp failed to create or access logfile" | tee -a "$logfile" ;;
+    2) echo "$timestamp must be run as root or with sudo!" | tee -a "$logfile" ;;
+    3) echo "$timestamp can't start the bluetooth service" | tee -a "$logfile" ;;
+    4) echo "$timestamp can't enable the bluetooth service" | tee -a "$logfile" ;;
+    *) echo "$timestamp unknown error" | tee -a "$logfile" ;;
   esac
 }
 

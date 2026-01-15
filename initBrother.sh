@@ -8,7 +8,9 @@
 
 BrotherProgs=(
   "cups"
+  "usbutils"
   "cups-filters"
+  "epiphany"
   "ghostscript"
   "avahi"
   "nss-mdns"
@@ -58,4 +60,5 @@ starting
 initing
 cleanup
 echo "########## $ippname"
-(kitty xdg-open http://localhost:631) &
+(epiphany http://localhost:631) &
+(simple-scan) &
