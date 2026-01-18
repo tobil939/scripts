@@ -29,6 +29,8 @@ progyay=(
   "gcc"
   "cmake"
   "make"
+  "mako"
+  "libnotify"
   "base-devel"
   "ripgrep"
   "luacheck"
@@ -122,6 +124,7 @@ proglang=(
   #"haskell"
   "nasm"
   "latex"
+  "mojo"
 )
 
 homedirs=(
@@ -746,25 +749,90 @@ cleanup() {
 #  stack haskell-debug-adapter
 #}
 
+brightness() {
+  get_timestamp
+  echo "$timestamp setting up the brightness changing of monitors" | tee -a "$logfile"
+  sudo modprobe i2c-dev
+  ddcutil detect
+  cat <<'EOF' >brightness.sh
+#!/usr/bin/env bash
+
+##### Prog to change the brightness of the Monitors
+##### ddcutil hast to be installed
+
+opt="$1"
+
+if [[ "$opt" == "-" ]]; then
+  ddcutil --display 2 setvcp 10 - 10
+  ddcutil --display 1 setvcp 10 - 10
+elif [[ "$opt" == "+" ]]; then
+  ddcutil --display 2 setvcp 10 + 10
+  ddcutil --display 1 setvcp 10 + 10
+else
+  echo "$opt is not valid"
+fi
+notify-send "Helligkeit Display 1: $(ddcutil --display 1 getvcp 10 | grep -oP 'current value\s*=\s*\K\d+')%"
+notify-send "Helligkeit Display 2: $(ddcutil --display 2 getvcp 10 | grep -oP 'current value\s*=\s*\K\d+')%"
+EOF
+
+  get_timestamp
+  echo "$timestamp make brightness.sh executable" | tee -a "$logfile"
+  chmod +x brightness.sh
+
+  get_timestamp
+  echo "$timestamp moving it do /usr/local/bin/"
+  mv brightness.sh /usr/local/bin/brightness.sh
+}
+
+mojo() {
+  get_timestamp
+  echo "$timestamp installing mojo" | tee -a "$logfile"
+  curl -fsSL https://pixi.sh/install.sh | bash
+
+  get_timestamp
+  echo "$timestamp reloading bash"
+  source ~/.bashrc
+
+  pixi init "first_mojo_project" -c https://conda.modular.com/max-nightly/ -c conda-forge
+
+  get_timestamp
+  echo "$timestamp changing into first_mojo_project"
+  cd first_mojo_project || exit 1
+
+  pixi add mojo
+
+  get_timestamp
+  echo "$timestamp showing the version of mojo" | tee -a "$logfile"
+  pixi run mojo --version | tee -a "$logfile"
+
+  cd .. || exit 1
+
+  get_timestamp
+  echo "$timestamp deleting first_mojo_project"
+  rm -rf first_mojo_project/
+}
+
 # Main
 echo "getting started"
 
 trap 'handling $?' EXIT
-logging
-rootcheck
-installyay
-installyaysudo
-installyaynosudo
+#logging
+#rootcheck
+#installyay
+#installyaysudo
+#installyaynosudo
 #installnpm
 #haskellstack
-makedir
-clonegit
-copieconf
-confbashrc
-get_dbus_address
-confdarkmode
-confblue
-upyay
+#makedir
+#clonegit
+#copieconf
+#confbashrc
+#get_dbus_address
+#confdarkmode
+#confblue
+#brightness
+mojo
+#upyay
 #upnpm
-uppacman
-cleanup
+#uppacman
+#cleanup
