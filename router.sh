@@ -1,178 +1,150 @@
 #!/usr/bin/env bash
-# Script: router.sh
+# Script: router-complete.sh
 # Author: tobil
-# Date: 2026-01-19_21:37:35
+# Date: 2026-01-20
 # License: MIT
-# Description: installing script for my router PC
-# The router haste two networks, outside from the prowider and the inside home network
+# Description: Router + Samba Shares Setup (einmalig ausführen)
 
-# Logfile
-logfile="$HOME/logging/logfile.log"
+set -e
+
+logfile="$HOME/logging/router-setup.log"
 logpath="$HOME/logging/"
 
-# Needed Programs
-needed=(
-  "iptables"
-  "bridge-utils"
-  "hostapd"
-  "dnsmasq"
-  "dhcpcd"
-)
+# Logging-Funktionen
+get_timestamp() { date +"%Y-%m-%d_%H:%M:%S"; }
 
-# Zeitstempel holen
-get_timestamp() {
-  timestamp=$(date +"%Y-%m-%d_%H:%M:%S")
+log() {
+  local ts=$(get_timestamp)
+  echo "$ts $*" | tee -a "$logfile"
 }
 
-# Logging initialisieren
-logging() {
-  get_timestamp
-  echo "$timestamp Log path: $logpath" | tee -a "$logfile"
-  echo "$timestamp Log file: $logfile" | tee -a "$logfile"
+mkdir -p "$logpath" 2>/dev/null
+touch "$logfile" 2>/dev/null || { echo "Kann Log nicht erstellen"; exit 1; }
 
-  # Logfile pruefen/erstellen
-  if [[ -f "$logfile" ]]; then
-    get_timestamp
-    echo "$timestamp Logfile exists" | tee -a "$logfile"
-  else
-    get_timestamp
-    echo "$timestamp Creating logfile" | tee -a "$logfile"
-    mkdir -p "$logpath" || {
-      echo "$timestamp Failed to create logpath" | tee -a "$logfile"
-      exit 1
-    }
-    touch "$logfile" || {
-      echo "$timestamp Failed to create logfile" | tee -a "$logfile"
-      exit 2
-    }
-    echo "$timestamp Logfile created" | tee -a "$logfile"
-  fi
-}
+# Pakete
+needed=(iw iptables bridge-utils hostapd dnsmasq dhcpcd samba)
 
-# Fehlerbehandlung
-handling() {
-  local error="$1"
-  get_timestamp
-  case $error in
-    0) echo "$timestamp Script completed successfully" | tee -a "$logfile" ;;
-    1) echo "$timestamp Directory error" | tee -a "$logfile" ;;
-    2) echo "$timestamp Logfile error" | tee -a "$logfile" ;;
-    4) echo "$timestamp nvim not installed" | tee -a "$logfile" ;;
-    5) echo "$timestamp problems installing" | tee -a "$logfile" ;;
-    6) echo "$timestamp problems forwarding the ip" | tee -a "$logfile" ;;
-    7) echo "$timestamp can't start the DNS Server" | tee -a "$logfile" ;;
-    8) echo "$timestamp can't starting the DHCP" | tee -a "$logfile" ;;
-    9) echo "$timestamp problems updating yay" | tee -a "$logfile" ;;
-    10) echo "$timestamp problems cleaning up yay" | tee -a "$logfile" ;;
-    *)
-      echo "$timestamp Unknown error: $error" | tee -a "$logfile"
-      exit "$error"
-      ;;
-  esac
-}
-
-# Installing the needed Programs
-install() {
-  get_timestamp
-  echo "$timestamp installing the needed programms" | tee -a "$logfile"
-
-  for prog in "${needed[@]}"; do
-    get_timestamp
-    echo "$timestamp installing $prog"
-    yay -S --noconfirm "$prog" || exit 5
+# Hauptfunktionen
+install_packages() {
+  log "Installiere Pakete..."
+  for pkg in "${needed[@]}"; do
+    yay -S --noconfirm "$pkg" || pacman -S --noconfirm "$pkg" || { log "Fehler bei $pkg"; exit 5; }
   done
 }
 
-# IP Forwarding
-ipforward() {
-  get_timestamp
-  echo "$timestamp activating IP Forwarding" | tee -a "$logfile"
-  echo 1 >/proc/sys/ipv4/ip_forward
-  sysctl -w net.ipv4.ip_forward=1 || exit 6
+enable_ip_forward() {
+  log "Aktiviere IP-Forwarding (dauerhaft)"
+  echo 'net.ipv4.ip_forward=1' | sudo tee /etc/sysctl.d/99-ipforward.conf
+  sudo sysctl --system
 }
 
-# LAN-Bridge setup
-bridge() {
-  get_timestamp
-  echo "$timestamp setting up the LAN-Bridge" | tee -a "$logfile"
-  ip link add name br0 type bridge
-  ip link set en1 master br0
+setup_bridge() {
+  log "Bridge einrichten"
+  ip link set enp7s0 down 2>/dev/null || true
+  ip link set wlan0 down 2>/dev/null || true
+  iw dev wlan0 set type managed 2>/dev/null || true
+
+  ip link add name br0 type bridge || true
+  ip link set enp7s0 master br0
   ip link set wlan0 master br0
   ip link set br0 up
+  ip link set enp7s0 up
   ip addr add 10.10.10.1/24 dev br0
 }
 
-# NAT with iptables
-nattables() {
-  get_timestamp
-  echo "$timestamp setting up the iptables"
-  iptables -t nat -A POSTROUTING -o en0 -j MASQUERADE
-  iptables -A FORWARD -i en0 -o br0 -m state --state RELATED,ESTABLISHED -j ACCEPT
-  iptables -A FORWARD -i br0 -o en0 -j ACCEPT
+setup_nat() {
+  log "NAT + Forwarding-Regeln"
+  iptables -t nat -F POSTROUTING
+  iptables -t nat -A POSTROUTING -o eno1 -j MASQUERADE
+  iptables -A FORWARD -i eno1 -o br0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+  iptables -A FORWARD -i br0 -o eno1 -j ACCEPT
 }
 
-# DHCP SERVER
-dhcpserver() {
-  get_timestamp
-  echo "$timestamp DHCP Server setup" | tee -a "$logfile"
-  cat <<EOF >/etc/dnsmasq.conf
-interface=br0 
+setup_dnsmasq() {
+  log "dnsmasq konfigurieren"
+  cat <<EOF | sudo tee /etc/dnsmasq.conf
+interface=br0
 dhcp-range=10.10.10.10,10.10.10.15,12h
 EOF
-
-  echo "$timestamp starting DNSMASQ" | tee -a "$logfile"
-  systemctl start dnsmasq || exit 7
+  sudo systemctl enable --now dnsmasq
 }
 
-# WLAN as AP hostapd
-hostAP() {
-  get_timestamp
-  echo "$timestamp setting up the Wlan AP" | tee -a "$logfile"
-  cat <<EOF >/etc/hostapd/hostapd.conf
-interface=wlan0 
-bridge=br0
+setup_hostapd() {
+  log "hostapd konfigurieren"
+  cat <<EOF | sudo tee /etc/hostapd/hostapd.conf
+interface=wlan0
+driver=nl80211
 ssid=bunga
-wpa_passphrase=bungahart 
 channel=6
-hw_mode=g 
+hw_mode=g
+wpa=2
+wpa_passphrase=bungahart
+wmm_enabled=1
+ieee80211n=0
+ignore_broadcast_ssid=0
+bridge=br0
+macaddr_acl=0
+auth_algs=1
+EOF
+  sudo systemctl enable --now hostapd
+}
+
+setup_samba_shares() {
+  log "Samba Shares einrichten"
+
+  sudo btrfs subvolume show /router1 2>/dev/null || sudo btrfs subvolume create /router1
+  sudo btrfs subvolume show /router2 2>/dev/null || sudo btrfs subvolume create /router2
+
+  sudo mkdir -p /router1 /router2
+
+  grep -q router1 /etc/fstab || echo "UUID=22bb2f09-87fe-45c8-a68b-678d699dab19 /router1 btrfs subvol=router1,defaults 0 2" | sudo tee -a /etc/fstab
+  grep -q router2 /etc/fstab || echo "UUID=652b1234-dae7-45e3-a349-a551cc1ee217 /router2 btrfs subvol=router2,defaults 0 2" | sudo tee -a /etc/fstab
+
+  sudo systemctl daemon-reload
+  sudo mount -a || log "mount -a fehlgeschlagen"
+
+  sudo chown -R tobil:tobil /router1 /router2
+  sudo chmod -R 775 /router1 /router2
+
+  cat <<EOF | sudo tee /etc/samba/smb.conf
+[global]
+   workgroup = WORKGROUP
+   server string = Router Shares
+   security = user
+   map to guest = bad user
+   usershare allow guests = yes
+
+[router1]
+   path = /router1
+   browseable = yes
+   writable = yes
+   guest ok = yes
+   read only = no
+
+[router2]
+   path = /router2
+   browseable = yes
+   writable = yes
+   guest ok = yes
+   read only = no
 EOF
 
-  get_timestamp
-  echo "$timestamp starting the Host AP" | tee -a "$logfile"
-  systemctl start hostapd
+  sudo systemctl enable --now smb nmb
+
+  if command -v firewall-cmd &>/dev/null; then
+    log "Firewall: Samba freigeben"
+    sudo firewall-cmd --permanent --add-service=samba
+    sudo firewall-cmd --reload
+  fi
 }
 
-# DHCP start
-startdhcp() {
-  get_timestamp
-  echo "$timestamp starting DHCP" | tee -a "$logfile"
-  dhcpcd en0 || exit 8
-}
-
-# Updating yay
-updateyay() {
-  get_timestamp
-  echo "$timestamp updating yay" | tee -a "$logfile"
-  yay -Syu --noconfirm || exit 9
-}
-
-# Cleaning up yay
-cleanup() {
-  get_timestamp
-  echo "$timestamp cleaning up" | tee -a "$logfile"
-  yay -Ycc --noconfirm || exit 10
-}
-
-trap 'handling $?' EXIT
-
-get_timestamp
-logging
-install
-ipforward
-bridge
-nattables
-dhcpserver
-hostAP
-startdhcp
-updateyay
-cleanup
+# Ausführung
+log "=== Router + Samba Setup Start ==="
+install_packages
+enable_ip_forward
+setup_bridge
+setup_nat
+setup_dnsmasq
+setup_hostapd
+setup_samba_shares
+log "=== Setup abgeschlossen ==="
