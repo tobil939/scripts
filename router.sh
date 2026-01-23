@@ -1,150 +1,388 @@
 #!/usr/bin/env bash
-# Script: router-complete.sh
-# Author: tobil
-# Date: 2026-01-20
-# License: MIT
-# Description: Router + Samba Shares Setup (einmalig ausführen)
+# router-complete-v7.sh – idempotent, robust (Arch Linux)
 
-set -e
+user=$(whoami)
+
+WAN_IF="eno1"
+LAN_ETH="enp7s0"
+LAN_WLAN="wlan0"
+
+LAN_IP="10.10.10.1/24"
+DHCP_RANGE="10.10.10.50,10.10.10.250,12h"
+
+SSID="bunga"
+WPA_PASS="bungahart"
+COUNTRY_CODE="DE"
 
 logfile="$HOME/logging/router-setup.log"
-logpath="$HOME/logging/"
+mkdir -p "$(dirname "$logfile")"
 
-# Logging-Funktionen
-get_timestamp() { date +"%Y-%m-%d_%H:%M:%S"; }
+log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" | tee -a "$logfile"; }
 
-log() {
-  local ts=$(get_timestamp)
-  echo "$ts $*" | tee -a "$logfile"
+log "=== Router-Setup Start ==="
+
+### Pakete
+log "Pakete installieren"
+needed=(
+"network-manager-applet"
+"fzf"
+"polkit"
+"qutebrowser"
+"pavucontrol"
+"kitty"
+"samba"
+ "libreoffice-still"
+  "gtk3"
+  "gtk4"
+   "copyq"
+  "ddcutil"
+  "bluez"
+  "bluez-utils"
+    "python"
+  "python3"
+  "python-debugpy"
+  "python-pip"
+  "blueman"
+  "evolution"
+ "nautilus"
+  "lxappearance"
+  "gedit"
+  "ttf-meslo-nerd"
+  "picom"
+  "feh"
+  "iw"
+  "iptables-nft"
+  "hostapd"
+  "dnsmasq"
+  "dhcpcd"
+)
+
+#echo "yay will be installed"
+#sudo pacman -S --needed --noconfirm git base-devel
+# if [[ ! -d "yay" ]]; then
+#    sudo -u "$user" git clone https://aur.archlinux.org/yay.git
+#    cd yay || exit 7
+#    sudo -u "$user" makepkg -si --noconfirm --needed || exit 8
+#    ce "$user"
+#  fi
+
+echo "install programs"
+for prog in "${needed[@]}"; do
+	echo "$prog will be installed"
+    yay -S "$prog" --needed --noconfirm 
+done
+
+echo "update yay"
+yay -Syu --noconfirm
+
+echo "set up bashrc"
+cat >>"$user/.bashrc" <<'HERE'
+# ~/.bashrc
+#
+
+# If not running interactively, don't do anything
+[[ $- != *i* ]] && return
+
+alias ls='ls --color=auto'
+alias grep='grep --color=auto'
+PS1='[\u@\h \W]\$ '
+# ~/.bashrc
+#
+
+# If not running interactively, don't do anything
+[[ $- != *i* ]] && return
+
+PS1='[\u@\h \W]\$ '
+#export GREP_COLORS='mt=1;35'
+#export LS_COLORS="di=1;35:fi=0:ln=36"
+
+alias grep='grep --color=auto'
+alias ls='ls --color=auto'
+alias sl='ls -lh --color=auto'
+
+fuzzy() {
+  local file
+  file=$(find . -type f | fzf --preview 'cat {}' --height 80% --border)
+  [[ -n "$file" ]] && nvim "$file"
 }
 
-mkdir -p "$logpath" 2>/dev/null
-touch "$logfile" 2>/dev/null || { echo "Kann Log nicht erstellen"; exit 1; }
+greppy() {
+  local file=$(find . -type f | fzf --preview "grep -i --color=always {q} {} | head -n 20" --bind "change:reload:find . -type f")
+  [[ -n "$file" ]] && nvim "$file" +/{q}
+}
 
-# Pakete
-needed=(iw iptables bridge-utils hostapd dnsmasq dhcpcd samba)
-
-# Hauptfunktionen
-install_packages() {
-  log "Installiere Pakete..."
-  for pkg in "${needed[@]}"; do
-    yay -S --noconfirm "$pkg" || pacman -S --noconfirm "$pkg" || { log "Fehler bei $pkg"; exit 5; }
+trs() {
+  for file in "$@"; do
+    filename=$(basename "$file")
+    mv "$file" /tmp/"$filename"
   done
 }
 
-enable_ip_forward() {
-  log "Aktiviere IP-Forwarding (dauerhaft)"
-  echo 'net.ipv4.ip_forward=1' | sudo tee /etc/sysctl.d/99-ipforward.conf
-  sudo sysctl --system
-}
+bashing() {
 
-setup_bridge() {
-  log "Bridge einrichten"
-  ip link set enp7s0 down 2>/dev/null || true
-  ip link set wlan0 down 2>/dev/null || true
-  iw dev wlan0 set type managed 2>/dev/null || true
+  local data
+  local path
+  local file
+  local oldpath
 
-  ip link add name br0 type bridge || true
-  ip link set enp7s0 master br0
-  ip link set wlan0 master br0
-  ip link set br0 up
-  ip link set enp7s0 up
-  ip addr add 10.10.10.1/24 dev br0
-}
+  oldpath=$(pwd)
 
-setup_nat() {
-  log "NAT + Forwarding-Regeln"
-  iptables -t nat -F POSTROUTING
-  iptables -t nat -A POSTROUTING -o eno1 -j MASQUERADE
-  iptables -A FORWARD -i eno1 -o br0 -m state --state RELATED,ESTABLISHED -j ACCEPT
-  iptables -A FORWARD -i br0 -o eno1 -j ACCEPT
-}
+  data="$1"
+  [[ -z "$data" ]] && exit 91
 
-setup_dnsmasq() {
-  log "dnsmasq konfigurieren"
-  cat <<EOF | sudo tee /etc/dnsmasq.conf
-interface=br0
-dhcp-range=10.10.10.10,10.10.10.15,12h
-EOF
-  sudo systemctl enable --now dnsmasq
-}
+  handling() {
+    local error="$1"
+    case $error in
+      0) echo "completed successfully" ;;
+      88) echo "can't change into directory" ;;
+      89) echo "can't create file" ;;
+      90) echo "can't make it executable" ;;
+      91) echo "no filename" ;;
+      *) echo "unknown error" ;;
+    esac
+  }
 
-setup_hostapd() {
-  log "hostapd konfigurieren"
-  cat <<EOF | sudo tee /etc/hostapd/hostapd.conf
-interface=wlan0
-driver=nl80211
-ssid=bunga
-channel=6
-hw_mode=g
-wpa=2
-wpa_passphrase=bungahart
-wmm_enabled=1
-ieee80211n=0
-ignore_broadcast_ssid=0
-bridge=br0
-macaddr_acl=0
-auth_algs=1
-EOF
-  sudo systemctl enable --now hostapd
-}
+  trap 'handling $?' EXIT
 
-setup_samba_shares() {
-  log "Samba Shares einrichten"
+  file=$(basename "$data")
+  path=$(dirname "$data")
 
-  sudo btrfs subvolume show /router1 2>/dev/null || sudo btrfs subvolume create /router1
-  sudo btrfs subvolume show /router2 2>/dev/null || sudo btrfs subvolume create /router2
+  if [[ -d "$path" ]]; then
+    cd "$path" || exit 88
+    [[ -f "$file" ]] && trs "$file"
+    touch "$file" || exit 89
+    chmod +x "$file" || exit 90
+    ls -lh
+  else
+    mkdir -p "$path"
+    cd "$path" || exit 88
+    touch "$file" || exit 89
+    chmod +x "$file" || exit 90
+    ls -lh
+  fi
 
-  sudo mkdir -p /router1 /router2
+  cat <<EOF >"$file"
+#!/usr/bin/env bash 
+# Script: $file
+# Author: $(whoami)
+# Date: $(date +"%Y-%m-%d_%H:%M:%S") 
+# License: MIT
+# Description: ....
 
-  grep -q router1 /etc/fstab || echo "UUID=22bb2f09-87fe-45c8-a68b-678d699dab19 /router1 btrfs subvol=router1,defaults 0 2" | sudo tee -a /etc/fstab
-  grep -q router2 /etc/fstab || echo "UUID=652b1234-dae7-45e3-a349-a551cc1ee217 /router2 btrfs subvol=router2,defaults 0 2" | sudo tee -a /etc/fstab
-
-  sudo systemctl daemon-reload
-  sudo mount -a || log "mount -a fehlgeschlagen"
-
-  sudo chown -R tobil:tobil /router1 /router2
-  sudo chmod -R 775 /router1 /router2
-
-  cat <<EOF | sudo tee /etc/samba/smb.conf
-[global]
-   workgroup = WORKGROUP
-   server string = Router Shares
-   security = user
-   map to guest = bad user
-   usershare allow guests = yes
-
-[router1]
-   path = /router1
-   browseable = yes
-   writable = yes
-   guest ok = yes
-   read only = no
-
-[router2]
-   path = /router2
-   browseable = yes
-   writable = yes
-   guest ok = yes
-   read only = no
 EOF
 
-  sudo systemctl enable --now smb nmb
+  cat <<'EOF' >>"$file"
+# Logfile 
+logfile="$HOME/logging/logfile.log"
+logpath="$HOME/logging/"
 
-  if command -v firewall-cmd &>/dev/null; then
-    log "Firewall: Samba freigeben"
-    sudo firewall-cmd --permanent --add-service=samba
-    sudo firewall-cmd --reload
+# Zeitstempel holen
+get_timestamp() {
+  timestamp=$(date +"%Y-%m-%d_%H:%M:%S")
+}
+
+# Logging initialisieren
+logging() {
+  get_timestamp
+  echo "$timestamp Log path: $logpath" | tee -a "$logfile"
+  echo "$timestamp Log file: $logfile" | tee -a "$logfile"
+
+  # Logfile pruefen/erstellen
+  if [[ -f "$logfile" ]]; then
+    get_timestamp
+    echo "$timestamp Logfile exists" | tee -a "$logfile"
+  else
+    get_timestamp
+    echo "$timestamp Creating logfile" | tee -a "$logfile"
+    mkdir -p "$logpath" || { echo "$timestamp Failed to create logpath" | tee -a "$logfile"; exit 1; }
+    touch "$logfile" || { echo "$timestamp Failed to create logfile" | tee -a "$logfile"; exit 2; }
+    echo "$timestamp Logfile created" | tee -a "$logfile"
   fi
 }
 
-# Ausführung
-log "=== Router + Samba Setup Start ==="
-install_packages
-enable_ip_forward
-setup_bridge
-setup_nat
-setup_dnsmasq
-setup_hostapd
-setup_samba_shares
-log "=== Setup abgeschlossen ==="
+# Fehlerbehandlung
+handling() {
+  local error="$1"
+  get_timestamp
+  case $error in
+    0) echo "$timestamp Script completed successfully" | tee -a "$logfile";;
+    1) echo "$timestamp Directory error" | tee -a "$logfile"; exit 1;;
+    2) echo "$timestamp Logfile error" | tee -a "$logfile"; exit 2;;
+    4) echo "$timestamp nvim not installed" | tee -a "$logfile"; exit 4;;
+    *) echo "$timestamp Unknown error: $error" | tee -a "$logfile"; exit "$error";;
+  esac
+}
+
+trap 'handling $?' EXIT
+
+EOF
+
+  cd "$oldpath" || exit 88
+}
+export PATH="/home/tobil/.pixi/bin:$PATH"
+HERE
+
+
+### WLAN freischalten (nicht aggressiv!)
+log "WLAN freischalten"
+rfkill unblock wifi 2>/dev/null || true
+
+### NetworkManager aus
+log "NetworkManager deaktivieren"
+systemctl disable --now NetworkManager 2>/dev/null || true
+
+### IP Forwarding
+log "IP Forwarding aktivieren"
+cat <<EOF >/etc/sysctl.d/99-ipforward.conf
+net.ipv4.ip_forward=1
+EOF
+sysctl --system
+
+### dhcpcd auf WAN begrenzen
+log "dhcpcd konfigurieren"
+cat <<EOF >/etc/dhcpcd.conf
+denyinterfaces br0
+denyinterfaces $LAN_ETH
+denyinterfaces $LAN_WLAN
+EOF
+
+### Bridge
+log "Bridge konfigurieren"
+ip link show br0 &>/dev/null || ip link add br0 type bridge
+ip link set br0 up
+
+ip link set "$LAN_ETH" up
+ip link set "$LAN_ETH" master br0 2>/dev/null || true
+
+ip addr flush dev br0 2>/dev/null || true
+ip addr replace "$LAN_IP" dev br0
+
+### NAT + Forwarding (idempotent)
+log "iptables NAT & Forwarding"
+iptables -t nat -C POSTROUTING -o "$WAN_IF" -j MASQUERADE 2>/dev/null || \
+iptables -t nat -A POSTROUTING -o "$WAN_IF" -j MASQUERADE
+
+iptables -C FORWARD -i "$WAN_IF" -o br0 -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || \
+iptables -A FORWARD -i "$WAN_IF" -o br0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+iptables -C FORWARD -i br0 -o "$WAN_IF" -j ACCEPT 2>/dev/null || \
+iptables -A FORWARD -i br0 -o "$WAN_IF" -j ACCEPT
+
+mkdir -p /etc/iptables
+iptables-save > /etc/iptables/iptables.rules
+
+systemctl enable --now iptables
+
+### WAN DHCP
+log "WAN hochfahren + DHCP"
+ip link set "$WAN_IF" up
+systemctl enable --now "dhcpcd@$WAN_IF"
+
+### dnsmasq
+log "dnsmasq konfigurieren"
+cat <<EOF >/etc/dnsmasq.conf
+interface=br0
+bind-interfaces
+dhcp-range=$DHCP_RANGE
+domain-needed
+bogus-priv
+log-dhcp
+EOF
+
+systemctl enable --now dnsmasq
+
+### WLAN + Bridge
+log "WLAN aktivieren & bridgen"
+ip link set "$LAN_WLAN" up
+ip link set "$LAN_WLAN" master br0 2>/dev/null || true
+
+### Samba-Shares (router1 + router2)
+sudo cat <<EOF > /etc/samba/smb.conf
+[global]
+workgroup = WORKGROUP
+server string = Router Shares
+security = user
+map to guest = bad user
+usershare allow guests = yes
+
+[router1]
+path = /router1
+browseable = yes
+writable = yes
+guest ok = yes
+read only = no
+
+[router2]
+path = /router2
+browseable = yes
+writable = yes
+guest ok = yes
+read only = no
+EOF
+
+log "Btrfs-Subvolumes & Mounts einrichten"
+sudo btrfs subvolume show /router1 2>/dev/null || sudo btrfs subvolume create /router1
+sudo btrfs subvolume show /router2 2>/dev/null || sudo btrfs subvolume create /router2
+sudo mkdir -p /router1 /router2
+
+grep -q router1 /etc/fstab || echo "UUID=f77fd751-015d-4bef-8485-c807f3cb2e59 /router1 btrfs subvol=router1,defaults 0 2" | sudo tee -a /etc/fstab
+grep -q router2 /etc/fstab || echo "UUID=1df43428-156a-4998-969a-c001314f3369 /router2 btrfs subvol=router2,defaults 0 2" | sudo tee -a /etc/fstab
+
+sudo systemctl daemon-reload
+sudo mount -a
+
+sudo chown -R $user:$user /router1 /router2
+sudo chmod -R 775 /router1 /router2
+
+### hostapd
+log "hostapd konfigurieren"
+cat <<EOF >/etc/hostapd/hostapd.conf
+interface=$LAN_WLAN
+bridge=br0
+driver=nl80211
+
+ssid=$SSID
+country_code=$COUNTRY_CODE
+ieee80211d=1
+
+hw_mode=g
+channel=6
+wmm_enabled=1
+
+ieee80211n=1
+ht_capab=[HT40+][SHORT-GI-20][SHORT-GI-40]
+
+auth_algs=1
+macaddr_acl=0
+ignore_broadcast_ssid=0
+
+wpa=2
+wpa_passphrase=$WPA_PASS
+wpa_key_mgmt=WPA-PSK
+wpa_pairwise=CCMP
+rsn_pairwise=CCMP
+wpa_disable_eapol_key_retries=1
+EOF
+
+echo 'DAEMON_CONF="/etc/hostapd/hostapd.conf"' > /etc/conf.d/hostapd
+
+### systemd-Override für WLAN-Device
+log "hostapd systemd-Override"
+mkdir -p /etc/systemd/system/hostapd.service.d
+cat <<EOF >/etc/systemd/system/hostapd.service.d/override.conf
+[Unit]
+BindsTo=sys-subsystem-net-devices-$LAN_WLAN.device
+After=sys-subsystem-net-devices-$LAN_WLAN.device
+EOF
+
+sudo chown -R "$user":"$user" /router1
+sudo chown -R "$user":"$user" /router2
+
+
+systemctl daemon-reload
+systemctl enable --now hostapd
+
+echo "cleaning up"
+yay -Ycc
+
+log "=== Fertig. Reboot empfohlen. ==="
