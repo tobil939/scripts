@@ -2,6 +2,12 @@
 # router-complete-v7.sh – idempotent, robust (Arch Linux)
 
 user=$(whoami)
+group=$(groups | awk '{print $1}')
+
+drive1="sda"
+drive2="nvme0n1"
+UUID1=$(lsblk -f | grep -E '$drive1*|btrfs' | awk '{print $3}')
+UUID2=$(lsblk -f | grep -E '$drive2*|btrfs' | awk '{print $3}')
 
 WAN_IF="eno1"
 LAN_ETH="enp7s0"
@@ -14,69 +20,107 @@ SSID="bunga"
 WPA_PASS="bungahart"
 COUNTRY_CODE="DE"
 
-logfile="$HOME/logging/router-setup.log"
-mkdir -p "$(dirname "$logfile")"
+loggin() {
+  logfile="$HOME/logging/router-setup.log"
+  mkdir -p "$(dirname "$logfile")"
+  touch "$HOME/logging/router-setup.log"
 
-log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" | tee -a "$logfile"; }
+  log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" | tee -a "$logfile"; }
 
-log "=== Router-Setup Start ==="
+  log "=== Router-Setup Start ==="
+}
 
-### Pakete
-log "Pakete installieren"
-needed=(
-"network-manager-applet"
-"fzf"
-"polkit"
-"qutebrowser"
-"pavucontrol"
-"kitty"
-"samba"
- "libreoffice-still"
-  "gtk3"
-  "gtk4"
-   "copyq"
-  "ddcutil"
-  "bluez"
-  "bluez-utils"
+handling() {
+  local error="$1"
+  case $error in
+    0) echo "everything is good" ;;
+    1) echo "stopping services went wronge" ;;
+    2) echo "can not install yay" ;;
+    3) echo "can not install programs" ;;
+    4) echo "can not activated wifi" ;;
+    5) echo "can not forward ip" ;;
+    6) echo "can not set to bridge" ;;
+    *) echo "" ;;
+  esac
+}
+
+deactivated() {
+  log "stopping services"
+  log "stop NetworkManager"
+  sudo systemctl disable --now NetworkManager || exit 1
+  log "stop iptables"
+  sudo systemctl stop iptables || exit 1
+  log "stop dhcpcd"
+  sudo systemctl stop "dhcpcd@$WAN_IF" || exit 1
+  log "stop dnsmasq"
+  sudo systemctl stop dnsmasq || exit 1
+  log "stop daemon-reload"
+  sudo systemctl stop daemon-reload || exit 1
+  log "stop hostapd"
+  sudo systemctl stop hostapd || exit 1
+  log "stop smb"
+  sudo systemctl stop smb || exit 1
+  log "stop nmb"
+  sudo systemctl stop nmb || exit 1
+}
+
+installprog() {
+  log "Pakete installieren"
+  needed=(
+    "network-manager-applet"
+    "fzf"
+    "polkit"
+    "qutebrowser"
+    "pavucontrol"
+    "kitty"
+    "samba"
+    "libreoffice-still"
+    "gtk3"
+    "gtk4"
+    "copyq"
+    "ddcutil"
+    "bluez"
+    "bluez-utils"
     "python"
-  "python3"
-  "python-debugpy"
-  "python-pip"
-  "blueman"
-  "evolution"
- "nautilus"
-  "lxappearance"
-  "gedit"
-  "ttf-meslo-nerd"
-  "picom"
-  "feh"
-  "iw"
-  "iptables-nft"
-  "hostapd"
-  "dnsmasq"
-  "dhcpcd"
-)
+    "python3"
+    "python-debugpy"
+    "python-pip"
+    "blueman"
+    "evolution"
+    "nautilus"
+    "lxappearance"
+    "gedit"
+    "ttf-meslo-nerd"
+    "picom"
+    "feh"
+    "iw"
+    "iptables-nft"
+    "hostapd"
+    "dnsmasq"
+    "dhcpcd"
+  )
 
-#echo "yay will be installed"
-#sudo pacman -S --needed --noconfirm git base-devel
-# if [[ ! -d "yay" ]]; then
-#    sudo -u "$user" git clone https://aur.archlinux.org/yay.git
-#    cd yay || exit 7
-#    sudo -u "$user" makepkg -si --noconfirm --needed || exit 8
-#    ce "$user"
-#  fi
+  log "yay will be installed"
+  sudo pacman -S --needed --noconfirm git base-devel
+  if [[ ! -d "yay" ]]; then
+    sudo -u "$user" git clone https://aur.archlinux.org/yay.git
+    cd yay || exit 2
+    sudo -u "$user" makepkg -si --noconfirm --needed || exit 2
+    cd "$user" || exit 2
+  fi
 
-echo "install programs"
-for prog in "${needed[@]}"; do
-	echo "$prog will be installed"
-    yay -S "$prog" --needed --noconfirm 
-done
+  log "install programs"
+  for prog in "${needed[@]}"; do
+    log "$prog will be installed"
+    yay -S "$prog" --needed --noconfirm || exit 3
+  done
 
-echo "update yay"
-yay -Syu --noconfirm
+  log "update yay"
+  yay -Syu --noconfirm || exit 3
+}
 
-echo "set up bashrc"
-cat >>"$user/.bashrc" <<'HERE'
+log "set up bashrc"
+cat >>"$user/.bashrc" <<'HERE' || exit 3
 # ~/.bashrc
 #
 
@@ -222,21 +266,16 @@ EOF
 export PATH="/home/tobil/.pixi/bin:$PATH"
 HERE
 
-
 ### WLAN freischalten (nicht aggressiv!)
 log "WLAN freischalten"
-rfkill unblock wifi 2>/dev/null || true
-
-### NetworkManager aus
-log "NetworkManager deaktivieren"
-systemctl disable --now NetworkManager 2>/dev/null || true
+rfkill unblock wifi || exit 4
 
 ### IP Forwarding
 log "IP Forwarding aktivieren"
 cat <<EOF >/etc/sysctl.d/99-ipforward.conf
 net.ipv4.ip_forward=1
 EOF
-sysctl --system
+sysctl --system || exit 5
 
 ### dhcpcd auf WAN begrenzen
 log "dhcpcd konfigurieren"
@@ -252,24 +291,24 @@ ip link show br0 &>/dev/null || ip link add br0 type bridge
 ip link set br0 up
 
 ip link set "$LAN_ETH" up
-ip link set "$LAN_ETH" master br0 2>/dev/null || true
+ip link set "$LAN_ETH" master br0 || exit 6
 
-ip addr flush dev br0 2>/dev/null || true
+ip addr flush dev br0 || exit 6
 ip addr replace "$LAN_IP" dev br0
 
 ### NAT + Forwarding (idempotent)
 log "iptables NAT & Forwarding"
-iptables -t nat -C POSTROUTING -o "$WAN_IF" -j MASQUERADE 2>/dev/null || \
-iptables -t nat -A POSTROUTING -o "$WAN_IF" -j MASQUERADE
+iptables -t nat -C POSTROUTING -o "$WAN_IF" -j MASQUERADE 2>/dev/null \
+  || iptables -t nat -A POSTROUTING -o "$WAN_IF" -j MASQUERADE
 
-iptables -C FORWARD -i "$WAN_IF" -o br0 -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || \
-iptables -A FORWARD -i "$WAN_IF" -o br0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+iptables -C FORWARD -i "$WAN_IF" -o br0 -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null \
+  || iptables -A FORWARD -i "$WAN_IF" -o br0 -m state --state RELATED,ESTABLISHED -j ACCEPT
 
-iptables -C FORWARD -i br0 -o "$WAN_IF" -j ACCEPT 2>/dev/null || \
-iptables -A FORWARD -i br0 -o "$WAN_IF" -j ACCEPT
+iptables -C FORWARD -i br0 -o "$WAN_IF" -j ACCEPT 2>/dev/null \
+  || iptables -A FORWARD -i br0 -o "$WAN_IF" -j ACCEPT
 
 mkdir -p /etc/iptables
-iptables-save > /etc/iptables/iptables.rules
+iptables-save >/etc/iptables/iptables.rules
 
 systemctl enable --now iptables
 
@@ -294,10 +333,10 @@ systemctl enable --now dnsmasq
 ### WLAN + Bridge
 log "WLAN aktivieren & bridgen"
 ip link set "$LAN_WLAN" up
-ip link set "$LAN_WLAN" master br0 2>/dev/null || true
+ip link set "$LAN_WLAN" master br0 || exit 7
 
 ### Samba-Shares (router1 + router2)
-sudo cat <<EOF > /etc/samba/smb.conf
+sudo cat <<EOF >/etc/samba/smb.conf
 [global]
 workgroup = WORKGROUP
 server string = Router Shares
@@ -311,6 +350,10 @@ browseable = yes
 writable = yes
 guest ok = yes
 read only = no
+force user = $user
+force group = $group
+create mask = 0644 
+directory mask = 0775
 
 [router2]
 path = /router2
@@ -318,6 +361,10 @@ browseable = yes
 writable = yes
 guest ok = yes
 read only = no
+force user = $user
+force group = $group
+create mask = 0644 
+directory mask = 0775
 EOF
 
 log "Btrfs-Subvolumes & Mounts einrichten"
@@ -325,14 +372,19 @@ sudo btrfs subvolume show /router1 2>/dev/null || sudo btrfs subvolume create /r
 sudo btrfs subvolume show /router2 2>/dev/null || sudo btrfs subvolume create /router2
 sudo mkdir -p /router1 /router2
 
-grep -q router1 /etc/fstab || echo "UUID=f77fd751-015d-4bef-8485-c807f3cb2e59 /router1 btrfs subvol=router1,defaults 0 2" | sudo tee -a /etc/fstab
-grep -q router2 /etc/fstab || echo "UUID=1df43428-156a-4998-969a-c001314f3369 /router2 btrfs subvol=router2,defaults 0 2" | sudo tee -a /etc/fstab
+grep -q router1 /etc/fstab || echo "$UUID1 /router1 btrfs subvol=router1,defaults 0 2" | sudo tee -a /etc/fstab
+grep -q router2 /etc/fstab || echo "$UUID2 /router2 btrfs subvol=router2,defaults 0 2" | sudo tee -a /etc/fstab
 
 sudo systemctl daemon-reload
 sudo mount -a
 
-sudo chown -R $user:$user /router1 /router2
-sudo chmod -R 775 /router1 /router2
+sudo chown -R "$user":"$group" /router1
+sudo chown -R "$user":"$group" /router1
+sudo chmod -R 775 /router1
+sudo chmod -R 775 /router2
+
+sudo systemctl enable --now smb
+sudo systemctl enable --now nmb
 
 ### hostapd
 log "hostapd konfigurieren"
@@ -364,7 +416,7 @@ rsn_pairwise=CCMP
 wpa_disable_eapol_key_retries=1
 EOF
 
-echo 'DAEMON_CONF="/etc/hostapd/hostapd.conf"' > /etc/conf.d/hostapd
+echo 'DAEMON_CONF="/etc/hostapd/hostapd.conf"' >/etc/conf.d/hostapd
 
 ### systemd-Override für WLAN-Device
 log "hostapd systemd-Override"
@@ -375,9 +427,8 @@ BindsTo=sys-subsystem-net-devices-$LAN_WLAN.device
 After=sys-subsystem-net-devices-$LAN_WLAN.device
 EOF
 
-sudo chown -R "$user":"$user" /router1
-sudo chown -R "$user":"$user" /router2
-
+sudo chown -R "$user":"$group" /router1
+sudo chown -R "$user":"$group" /router2
 
 systemctl daemon-reload
 systemctl enable --now hostapd
