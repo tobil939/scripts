@@ -323,6 +323,11 @@ nat() {
   iptables -t nat -C POSTROUTING -o "$WAN_IF" -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -o "$WAN_IF" -j MASQUERADE || exit 9
   iptables -C FORWARD -i "$WAN_IF" -o br0 -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || iptables -A FORWARD -i "$WAN_IF" -o br0 -m state --state RELATED,ESTABLISHED -j ACCEPT || exit 9
   iptables -C FORWARD -i br0 -o "$WAN_IF" -j ACCEPT 2>/dev/null || iptables -A FORWARD -i br0 -o "$WAN_IF" -j ACCEPT || exit 9
+ 
+  # SSH erlauben (Port 22)
+  iptables -C INPUT -p tcp --dport 22 -j ACCEPT 2>/dev/null || iptables -A INPUT -p tcp --dport 22 -j ACCEPT || exit 9
+  
+  mkdir -p /etc/iptables || exit 9
    mkdir -p /etc/iptables || exit 9
    iptables-save >/etc/iptables/iptables.rules || exit 9
    systemctl enable --now iptables || exit 9
@@ -460,7 +465,7 @@ EOF
   systemctl enable --now hostapd || exit 16
 }
 trap 'handling $?' EXIT
-log "=== Router-Setup Start ==="
+log "=== Router-Setup Start ==="ptables-save > /etc/iptables/iptables.rules || exit 9
 deactivated
 installprog
 bashing
